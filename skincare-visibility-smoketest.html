@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Does AI recommend your skincare brand? — Free visibility check</title>
+<!--
+  SMOKE-TEST LANDING PAGE — skincare niche
+  PURPOSE: measure whether skincare Shopify founders want an AI-visibility check, BEFORE building the app.
+  TO GO LIVE:
+   1. Replace FORM_ENDPOINT below with your Formspree/Tally/Getform endpoint (all have free tiers).
+   2. Deploy free on Vercel, Netlify, Cloudflare Pages or GitHub Pages (drag-and-drop this file).
+   3. Send ~£50 of traffic (Meta/Reddit ads targeting skincare founders, or post in DTC/Shopify communities).
+   4. Read the signal: signups ÷ visitors. A healthy smoke test converts ~5%+ of targeted visitors.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --porcelain:#F1E9E2;
+    --panel:#E7DCD1;
+    --white:#FBF8F4;
+    --ink:#241E1B;
+    --ink-soft:#5C534C;
+    --plum:#5C2E43;
+    --plum-bright:#8A4A63;
+    --sage:#6F8268;
+    --missing:#AEA197;
+    --line:#D8CCBF;
+    --shadow:24px 24px 60px rgba(60,40,40,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--porcelain);
+    color:var(--ink);
+    font-family:"Hanken Grotesk",system-ui,sans-serif;
+    font-size:17px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:0 28px}
+  .eyebrow{
+    font-family:"JetBrains Mono",monospace;
+    font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--plum);font-weight:500;
+  }
+  h1{
+    font-family:"Newsreader",serif;font-weight:400;
+    font-size:clamp(2.5rem,5.4vw,4.3rem);line-height:1.03;
+    letter-spacing:-.015em;margin:.4em 0 .5em;
+  }
+  h1 em{font-style:italic;color:var(--plum)}
+  .lede{font-size:clamp(1.05rem,1.7vw,1.28rem);color:var(--ink-soft);max-width:32ch}
+
+  /* ---- top bar ---- */
+  header{padding:26px 0 6px}
+  .brandmark{display:flex;align-items:center;gap:11px;font-family:"Newsreader",serif;font-size:21px;letter-spacing:-.01em}
+  .dot{width:13px;height:13px;border-radius:50%;background:var(--plum);position:relative;flex:none}
+  .dot::after{content:"";position:absolute;inset:3.5px;border-radius:50%;background:var(--porcelain)}
+
+  /* ---- hero ---- */
+  .hero{display:grid;grid-template-columns:1fr 1.02fr;gap:56px;align-items:center;padding:46px 0 78px}
+  .hero-cta{display:flex;flex-direction:column;gap:14px;margin-top:34px;max-width:430px}
+  form{display:flex;gap:9px;background:var(--white);padding:7px;border-radius:14px;border:1px solid var(--line);box-shadow:0 1px 0 rgba(0,0,0,.02)}
+  input[type=email]{
+    flex:1;border:0;background:transparent;padding:13px 14px;font:inherit;font-size:16px;color:var(--ink);min-width:0;
+  }
+  input[type=email]::placeholder{color:#a59a90}
+  input[type=email]:focus{outline:none}
+  button{
+    font:inherit;font-weight:600;font-size:15px;cursor:pointer;border:0;
+    background:var(--plum);color:#fff;padding:13px 22px;border-radius:9px;
+    transition:background .18s ease,transform .18s ease;white-space:nowrap;
+  }
+  button:hover{background:var(--plum-bright)}
+  button:active{transform:translateY(1px)}
+  form:focus-within{border-color:var(--plum);box-shadow:0 0 0 3px rgba(92,46,67,.13)}
+  .microcopy{font-size:13.5px;color:var(--ink-soft);padding-left:4px}
+  .microcopy b{color:var(--ink);font-weight:600}
+
+  /* ---- the signature: AI answer card ---- */
+  .answer-card{
+    background:var(--white);border:1px solid var(--line);border-radius:20px;
+    box-shadow:var(--shadow);overflow:hidden;
+  }
+  .ac-top{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .ac-top span{width:10px;height:10px;border-radius:50%;background:#cdbfb2}
+  .ac-top .lbl{margin-left:6px;font-family:"JetBrains Mono",monospace;font-size:11.5px;letter-spacing:.04em;color:var(--ink-soft);width:auto;height:auto;border-radius:0;background:none}
+  .ac-body{padding:22px 22px 24px}
+  .query{
+    font-family:"JetBrains Mono",monospace;font-size:13.5px;color:var(--ink);
+    background:var(--porcelain);border:1px solid var(--line);border-radius:11px;
+    padding:12px 15px;display:flex;gap:9px;align-items:flex-start;
+  }
+  .query::before{content:"›";color:var(--plum);font-weight:600}
+  .ans-label{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--missing);margin:20px 0 12px}
+  .rec{display:flex;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px dashed var(--line)}
+  .rec .num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--plum);flex:none;width:18px}
+  .rec .name{font-family:"Newsreader",serif;font-size:19px;font-weight:500}
+  .rec .tag{font-size:12.5px;color:var(--ink-soft);margin-left:auto;font-family:"JetBrains Mono",monospace}
+  .absent{
+    margin-top:18px;padding:15px 17px;border-radius:12px;
+    background:rgba(92,46,67,.055);border:1px dashed var(--plum);
+    display:flex;gap:12px;align-items:center;
+    opacity:0;transform:translateY(8px);
+    animation:rise .7s ease .5s forwards;
+  }
+  .absent .x{font-family:"Newsreader",serif;font-size:22px;color:var(--plum);flex:none;line-height:1}
+  .absent .t{font-size:15px}
+  .absent .t b{color:var(--plum)}
+  .absent .t span{color:var(--ink-soft);font-size:13.5px;display:block;margin-top:2px}
+  @keyframes rise{to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.absent{animation:none;opacity:1;transform:none}}
+
+  /* ---- shift band ---- */
+  .band{background:var(--ink);color:var(--porcelain);padding:74px 0}
+  .band .wrap{display:grid;grid-template-columns:1.1fr 1fr;gap:54px;align-items:center}
+  .band h2{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(1.7rem,3.2vw,2.5rem);line-height:1.12;letter-spacing:-.01em}
+  .band h2 em{font-style:italic;color:#E3A9BD}
+  .band p{color:#C9BEB5;margin-top:18px;max-width:42ch}
+  .stats{display:flex;flex-direction:column;gap:2px}
+  .stat{padding:20px 0;border-top:1px solid rgba(255,255,255,.13)}
+  .stat:last-child{border-bottom:1px solid rgba(255,255,255,.13)}
+  .stat b{font-family:"Newsreader",serif;font-size:2.1rem;font-weight:500;color:#fff;display:inline-block;min-width:3.6ch}
+  .stat .d{color:#C9BEB5;font-size:15px;display:inline}
+
+  /* ---- how ---- */
+  .how{padding:84px 0}
+  .how h2{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(1.9rem,3.4vw,2.7rem);letter-spacing:-.01em;max-width:18ch;margin-bottom:48px}
+  .how h2 em{font-style:italic;color:var(--plum)}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
+  .step{border-top:2px solid var(--plum);padding-top:18px}
+  .step .n{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--plum);letter-spacing:.06em}
+  .step h3{font-family:"Newsreader",serif;font-weight:500;font-size:1.32rem;margin:10px 0 8px}
+  .step p{color:var(--ink-soft);font-size:15.5px}
+
+  /* ---- close ---- */
+  .close{padding:14px 0 96px}
+  .close-card{
+    background:linear-gradient(155deg,var(--plum),#43202F);
+    color:var(--porcelain);border-radius:24px;padding:clamp(36px,5vw,68px);
+    text-align:center;box-shadow:var(--shadow);
+  }
+  .close-card h2{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(1.8rem,3.6vw,2.8rem);line-height:1.1;letter-spacing:-.01em;margin-bottom:14px}
+  .close-card h2 em{font-style:italic;color:#F0C3D1}
+  .close-card p{color:#E6D2DA;max-width:46ch;margin:0 auto 30px}
+  .close-card form{max-width:440px;margin:0 auto;background:rgba(255,255,255,.96)}
+  .close .microcopy{color:#E6D2DA;text-align:center;margin-top:16px}
+  .close .microcopy b{color:#fff}
+
+  footer{border-top:1px solid var(--line);padding:30px 0 56px;color:var(--ink-soft);font-size:13.5px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+  footer .brandmark{font-size:17px;color:var(--ink)}
+
+  .ok{display:none;font-family:"Hanken Grotesk";font-weight:600;color:var(--sage);padding:13px 4px;font-size:15.5px}
+  .ok.show{display:block}
+  form.done{display:none}
+
+  @media (max-width:860px){
+    .hero{grid-template-columns:1fr;gap:40px;padding:34px 0 56px}
+    .hero-cta{max-width:none}
+    .band .wrap{grid-template-columns:1fr;gap:34px}
+    .how .steps{grid-template-columns:1fr;gap:26px}
+    .answer-card{order:-1}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="brandmark"><span class="dot"></span>Visible</div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="wrap hero">
+  <div class="hero-copy">
+    <p class="eyebrow">For skincare brands on Shopify</p>
+    <h1>Shoppers ask AI which serum to buy. Is it <em>recommending you?</em></h1>
+    <p class="lede">ChatGPT, Perplexity and Gemini are the new shop window. We check whether your brand shows up when buyers ask — and show you exactly how to get recommended.</p>
+    <div class="hero-cta">
+      <form action="FORM_ENDPOINT" method="POST" data-form>
+        <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
+        <button type="submit">Get my free check</button>
+      </form>
+      <p class="ok" role="status">Thanks — your free visibility check is reserved. We'll email it to you.</p>
+      <p class="microcopy"><b>Free during early access.</b> We email your report. No card needed.</p>
+    </div>
+  </div>
+
+  <!-- SIGNATURE: the AI answer your brand is missing from -->
+  <div class="answer-card" aria-label="Example AI shopping answer">
+    <div class="ac-top"><span></span><span></span><span></span><em class="lbl">AI shopping answer</em></div>
+    <div class="ac-body">
+      <div class="query">best vitamin C serum for sensitive, acne-prone skin under £40?</div>
+      <p class="ans-label">Here are three well-reviewed options:</p>
+      <div class="rec"><span class="num">1</span><span class="name">Luma Bright C+</span><span class="tag">15% L-AA · calming</span></div>
+      <div class="rec"><span class="num">2</span><span class="name">Aurelle Daily Glow</span><span class="tag">THD ascorbate</span></div>
+      <div class="rec"><span class="num">3</span><span class="name">Verde Clear Serum</span><span class="tag">niacinamide blend</span></div>
+      <div class="absent">
+        <span class="x">—</span>
+        <span class="t"><b>Your brand wasn't mentioned.</b><span>Across 30+ buying questions, the AI never put you on the list.</span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- THE SHIFT -->
+<section class="band">
+  <div class="wrap">
+    <div>
+      <h2>The shelf moved. <em>Most brands haven't.</em></h2>
+      <p>Buyers used to start at Google. Now they ask an AI to pick for them — and it names a handful of brands, not a page of links. If you're not in that handful, you don't get the click, the trial, or the customer.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>64%</b><span class="d"> of shoppers plan to buy through AI chatbots in 2026.</span></div>
+      <div class="stat"><b>#1</b><span class="d"> influence on what makes a buyer's shortlist — ahead of review sites and ads.</span></div>
+      <div class="stat"><b>~30%</b><span class="d"> of beauty shoppers already use AI to research what to buy.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section class="wrap how">
+  <h2>A plain-English check. <em>No dashboard to learn.</em></h2>
+  <div class="steps">
+    <div class="step"><div class="n">Step 01</div><h3>Tell us your store</h3><p>Your URL and a few hero products. That's all we need to begin.</p></div>
+    <div class="step"><div class="n">Step 02</div><h3>We ask what your shoppers ask</h3><p>Dozens of real buying questions, run across ChatGPT, Perplexity and Gemini.</p></div>
+    <div class="step"><div class="n">Step 03</div><h3>You get the report</h3><p>Where you show up, who's beating you, and the fixes that actually move the needle.</p></div>
+  </div>
+</section>
+
+<!-- CLOSE -->
+<section class="wrap close">
+  <div class="close-card">
+    <h2>See where you stand <em>before your competitors do.</em></h2>
+    <p>We're running free visibility checks for a first group of skincare brands. Ongoing monitoring will be £29/mo at launch — early-access brands lock that in.</p>
+    <form action="FORM_ENDPOINT" method="POST" data-form>
+      <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
+      <button type="submit">Reserve my free check</button>
+    </form>
+    <p class="ok" role="status">Thanks — you're on the early-access list. Your report's on the way.</p>
+    <p class="microcopy"><b>Limited first group.</b> Free check + locked-in £29/mo if you continue.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;width:100%;gap:18px;flex-wrap:wrap;padding:0 28px">
+    <div class="brandmark"><span class="dot"></span>Visible</div>
+    <div>AI-visibility checks for skincare brands · Launching 2026 · Independent, not affiliated with any AI provider.</div>
+  </div>
+</footer>
+
+<script>
+  // Smoke-test form handling.
+  // If FORM_ENDPOINT is set to a real endpoint (Formspree/Getform/etc.), the email POSTs there.
+  // Either way the visitor sees a success state so the page feels complete during testing.
+  document.querySelectorAll('[data-form]').forEach(function(f){
+    f.addEventListener('submit', function(e){
+      var endpoint = f.getAttribute('action');
+      var ok = f.parentElement.querySelector('.ok');
+      var emailField = f.querySelector('input[type=email]');
+      if(!emailField.checkValidity()){ return; }   // let native validation show
+      e.preventDefault();
+      if(endpoint && endpoint !== 'FORM_ENDPOINT'){
+        fetch(endpoint, {method:'POST', body:new FormData(f), headers:{'Accept':'application/json'}}).catch(function(){});
+      }
+      f.classList.add('done');
+      if(ok) ok.classList.add('show');
+    });
+  });
+</script>
+</body>
+</html>
