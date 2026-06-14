@@ -521,7 +521,7 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
       bodyText    ? `Body text snippet: ${bodyText.slice(0, 1200)}` : '',
     ].filter(Boolean).join('\n');
 
-  const prompt = `Analyse the website signals below. Return ONLY a valid JSON object — no markdown, no fences.
+  const prompt = `Analyse the website signals below. Return ONLY a valid JSON object — no markdown, no fences. Be concise: keep all string values brief (under 20 words each). Arrays should have no more than 6 items each.
 
 {
   "organisation_name": "trading name only — not a page title or blog heading",
@@ -560,7 +560,7 @@ ${signalsBlock}`;
   const MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-lite'];
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
   };
 
   let result, usedModel;
