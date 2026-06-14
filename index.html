@@ -199,7 +199,8 @@
   .ask-panel-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
   .ask-panel-item{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:7px;background:var(--porcelain);border:1px solid var(--line)}
   .ask-panel-item.highlighted{background:rgba(15,118,110,.07);border-color:rgba(15,118,110,.3)}
-  .ask-panel-name{font-weight:600;color:var(--ink);min-width:0;flex:none;max-width:130px;word-break:break-word}
+  .ask-panel-name{font-weight:600;color:var(--plum);min-width:0;flex:none;max-width:130px;word-break:break-word;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+  .ask-panel-name:hover{color:var(--ink)}
   .ask-panel-reason{color:var(--ink-soft);font-size:12px;margin:0}
   .ask-panel-yours{font-size:11px;font-weight:600;color:#0f766e;background:rgba(15,118,110,.1);border-radius:4px;padding:1px 6px;flex:none;margin-top:2px}
   .ask-panel-loading{color:var(--ink-soft);font-size:12px;font-style:italic}
@@ -595,7 +596,8 @@
             var isYours = bizLower.length > 2 && (recLower.includes(bizLower) || bizLower.includes(recLower));
             html += '<li class="ask-panel-item' + (isYours ? ' highlighted' : '') + '">';
             html += '<div style="display:flex;flex-direction:column;gap:3px;flex:none;min-width:0;max-width:130px">';
-            html += '<span class="ask-panel-name">' + escHtml(rec.name || '') + '</span>';
+            var searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(rec.name || '');
+            html += '<a class="ask-panel-name" href="' + searchUrl + '" target="_blank" rel="noopener noreferrer">' + escHtml(rec.name || '') + '</a>';
             if (isYours) html += '<span class="ask-panel-yours">Your business</span>';
             html += '</div>';
             html += '<p class="ask-panel-reason">' + escHtml(rec.reason || '') + '</p>';
