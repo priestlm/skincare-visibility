@@ -639,8 +639,11 @@ ${signalsBlock}`;
     });
 
     if (result.status !== 200) {
-      console.error('Gemini API error', result.status, JSON.stringify(result.body).slice(0, 300));
-      return { _error: `api_status_${result.status}` };
+      const bodyStr = JSON.stringify(result.body).slice(0, 400);
+      console.error('Gemini API error', result.status, bodyStr);
+      // Expose error detail so callers can distinguish rate-limit types
+      const errDetail = result.body?.error?.message || result.body?.error?.status || '';
+      return { _error: `api_status_${result.status}`, _errorDetail: errDetail };
     }
 
     const text = result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -1104,10 +1107,16 @@ module.exports = async (req, res) => {
       aiAssisted = true;
       aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
     } else {
-      questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, why_relevant: '' }));
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
-      if (geminiRaw?._error) aiExtras = { geminiError: geminiRaw._error };
+      if (geminiRaw?._error) {
+        aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '' };
+        // Gemini key present but call failed — don't show generic category questions
+        // that are unrelated to this business. Show weak-evidence warning instead.
+        questions = []; questionsRich = []; weakEvidence = true;
+      } else {
+        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, why_relevant: '' }));
+      }
     }
   } else {
     const geminiRaw = await callGemini(extracted, targetUrl, analysisStatus);
@@ -1127,10 +1136,16 @@ module.exports = async (req, res) => {
       aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
     } else {
       ({ primary, categories } = detectCategories(extracted));
-      questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, why_relevant: '' }));
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
-      if (geminiRaw?._error) aiExtras = { geminiError: geminiRaw._error };
+      if (geminiRaw?._error) {
+        aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '' };
+        // Gemini key present but call failed — don't show generic category questions
+        // that are unrelated to this business. Show weak-evidence warning instead.
+        questions = []; questionsRich = []; weakEvidence = true;
+      } else {
+        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, why_relevant: '' }));
+      }
     }
   }
 

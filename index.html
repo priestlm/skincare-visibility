@@ -523,7 +523,10 @@
     if (data.weakEvidence) {
       var weak = document.createElement('p');
       weak.style.cssText = 'font-size:13px;color:var(--ink-soft);font-style:italic;margin:0';
-      weak.textContent = 'Unable to generate reliable business-specific questions from the available evidence.';
+      var isRateLimit = data.geminiError && data.geminiError.indexOf('429') !== -1;
+      weak.textContent = isRateLimit
+        ? 'AI analysis is temporarily unavailable (rate limit). Please try again in a few minutes.'
+        : 'Unable to generate reliable business-specific questions from the available evidence.';
       qEl.appendChild(weak);
     }
 
