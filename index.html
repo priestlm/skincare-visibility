@@ -47,6 +47,7 @@
   /* ---- top bar ---- */
   header{padding:26px 0 6px}
   .brandmark{display:flex;align-items:center;gap:11px;font-family:"Newsreader",serif;font-size:21px;letter-spacing:-.01em}
+  .build-ts{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--ink-soft);opacity:.45;letter-spacing:.04em;white-space:nowrap}
   .dot{width:13px;height:13px;border-radius:50%;background:var(--plum);position:relative;flex:none}
   .dot::after{content:"";position:absolute;inset:3.5px;border-radius:50%;background:var(--porcelain)}
 
@@ -236,8 +237,9 @@
 <body>
 
 <header>
-  <div class="wrap">
+  <div class="wrap" style="display:flex;align-items:center;justify-content:space-between">
     <div class="brandmark"><span class="dot"></span>Visible</div>
+    <span class="build-ts">Last update: {{BUILD_TIMESTAMP}}</span>
   </div>
 </header>
 

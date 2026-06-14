@@ -1,4 +1,5 @@
 {
+  "buildCommand": "node build.js",
   "functions": {
     "api/analyse.js": {
       "memory": 256,
