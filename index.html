@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Does AI recommend your skincare brand? — Free visibility check</title>
+<title>When shoppers ask AI what to buy, does it recommend your brand? — Free visibility check</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -38,11 +38,11 @@
   }
   h1{
     font-family:"Newsreader",serif;font-weight:400;
-    font-size:clamp(2.5rem,5.4vw,4.3rem);line-height:1.03;
+    font-size:clamp(2.2rem,4.8vw,3.9rem);line-height:1.05;
     letter-spacing:-.015em;margin:.4em 0 .5em;
   }
   h1 em{font-style:italic;color:var(--plum)}
-  .lede{font-size:clamp(1.05rem,1.7vw,1.28rem);color:var(--ink-soft);max-width:32ch}
+  .lede{font-size:clamp(1.05rem,1.7vw,1.22rem);color:var(--ink-soft);max-width:34ch}
 
   /* ---- top bar ---- */
   header{padding:26px 0 6px}
@@ -52,19 +52,17 @@
 
   /* ---- hero ---- */
   .hero{display:grid;grid-template-columns:1fr 1.02fr;gap:56px;align-items:center;padding:46px 0 78px}
-  .hero-cta{display:flex;flex-direction:column;gap:14px;margin-top:34px;max-width:430px}
+  .hero-cta{display:flex;flex-direction:column;gap:14px;margin-top:34px;max-width:440px}
 
   /* ---- analysis input form ---- */
   .url-form{display:flex;flex-direction:column;gap:8px}
   .url-row{display:flex;gap:9px;background:var(--white);padding:7px;border-radius:14px;border:1px solid var(--line);box-shadow:0 1px 0 rgba(0,0,0,.02)}
   .url-row:focus-within{border-color:var(--plum);box-shadow:0 0 0 3px rgba(92,46,67,.13)}
-  .url-row input{
-    flex:1;border:0;background:transparent;padding:13px 14px;font:inherit;font-size:16px;color:var(--ink);min-width:0;
-  }
+  .url-row input{flex:1;border:0;background:transparent;padding:13px 14px;font:inherit;font-size:16px;color:var(--ink);min-width:0}
   .url-row input::placeholder{color:#a59a90}
   .url-row input:focus{outline:none}
   .optional-row{display:flex;gap:8px}
-  .optional-row input, .optional-row select{
+  .optional-row input,.optional-row select{
     flex:1;border:1px solid var(--line);background:var(--white);padding:10px 13px;
     border-radius:9px;font:inherit;font-size:14.5px;color:var(--ink);min-width:0;
   }
@@ -81,13 +79,13 @@
   button:active{transform:translateY(1px)}
   button:disabled{opacity:.55;cursor:default;transform:none}
   .btn-full{width:100%}
+  .btn-ghost{background:transparent;color:var(--plum);border:1.5px solid var(--plum)}
+  .btn-ghost:hover{background:rgba(92,46,67,.06)}
 
   /* ---- email capture form ---- */
   form.email-form{display:flex;gap:9px;background:var(--white);padding:7px;border-radius:14px;border:1px solid var(--line);box-shadow:0 1px 0 rgba(0,0,0,.02)}
   form.email-form:focus-within{border-color:var(--plum);box-shadow:0 0 0 3px rgba(92,46,67,.13)}
-  form.email-form input[type=email]{
-    flex:1;border:0;background:transparent;padding:13px 14px;font:inherit;font-size:16px;color:var(--ink);min-width:0;
-  }
+  form.email-form input[type=email]{flex:1;border:0;background:transparent;padding:13px 14px;font:inherit;font-size:16px;color:var(--ink);min-width:0}
   form.email-form input[type=email]::placeholder{color:#a59a90}
   form.email-form input[type=email]:focus{outline:none}
   .microcopy{font-size:13.5px;color:var(--ink-soft);padding-left:4px}
@@ -100,13 +98,26 @@
   .step{display:none}
   .step.active{display:block}
 
-  /* ---- loading state ---- */
+  /* ---- loading ---- */
   .loading-wrap{display:flex;flex-direction:column;gap:10px;padding:6px 0}
   .loading-label{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--plum);letter-spacing:.04em}
   .progress-bar{height:3px;background:var(--line);border-radius:2px;overflow:hidden}
   .progress-fill{height:100%;background:var(--plum);border-radius:2px;width:0%;transition:width .4s ease}
 
-  /* ---- result: answer card ---- */
+  /* ---- fallback (manual category selector) ---- */
+  .fallback-wrap{display:flex;flex-direction:column;gap:12px}
+  .fallback-notice{
+    background:rgba(92,46,67,.06);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;font-size:15px;color:var(--ink-soft);line-height:1.55;
+  }
+  .fallback-notice b{color:var(--ink)}
+  .fallback-select{
+    width:100%;border:1px solid var(--line);background:var(--white);padding:12px 14px;
+    border-radius:9px;font:inherit;font-size:15px;color:var(--ink);cursor:pointer;
+  }
+  .fallback-select:focus{outline:none;border-color:var(--plum)}
+
+  /* ---- answer card (mock) ---- */
   .answer-card{
     background:var(--white);border:1px solid var(--line);border-radius:20px;
     box-shadow:var(--shadow);overflow:hidden;
@@ -116,11 +127,11 @@
   .ac-top .lbl{margin-left:6px;font-family:"JetBrains Mono",monospace;font-size:11.5px;letter-spacing:.04em;color:var(--ink-soft);width:auto;height:auto;border-radius:0;background:none}
   .ac-body{padding:22px 22px 24px}
   .query{
-    font-family:"JetBrains Mono",monospace;font-size:13.5px;color:var(--ink);
+    font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--ink);
     background:var(--porcelain);border:1px solid var(--line);border-radius:11px;
-    padding:12px 15px;display:flex;gap:9px;align-items:flex-start;
+    padding:12px 15px;display:flex;gap:9px;align-items:flex-start;line-height:1.45;
   }
-  .query::before{content:"›";color:var(--plum);font-weight:600}
+  .query::before{content:"›";color:var(--plum);font-weight:600;flex:none}
   .ans-label{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--missing);margin:20px 0 12px}
   .rec{display:flex;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px dashed var(--line)}
   .rec .num{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--plum);flex:none;width:18px}
@@ -130,8 +141,7 @@
     margin-top:18px;padding:15px 17px;border-radius:12px;
     background:rgba(92,46,67,.055);border:1px dashed var(--plum);
     display:flex;gap:12px;align-items:center;
-    opacity:0;transform:translateY(8px);
-    animation:rise .7s ease .5s forwards;
+    opacity:0;transform:translateY(8px);animation:rise .7s ease .5s forwards;
   }
   .absent .x{font-family:"Newsreader",serif;font-size:22px;color:var(--plum);flex:none;line-height:1}
   .absent .t{font-size:15px}
@@ -140,24 +150,25 @@
   @keyframes rise{to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){.absent{animation:none;opacity:1;transform:none}}
 
-  /* ---- result panel ---- */
+  /* ---- result card ---- */
   .result-card{
     background:var(--white);border:1px solid var(--line);border-radius:20px;
     box-shadow:var(--shadow);overflow:hidden;
-    opacity:0;transform:translateY(12px);
-    animation:rise .5s ease forwards;
+    opacity:0;transform:translateY(12px);animation:rise .5s ease forwards;
   }
-  .result-badge{
+  .category-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .cat-tag{
     display:inline-block;font-family:"JetBrains Mono",monospace;font-size:11px;
-    letter-spacing:.1em;text-transform:uppercase;background:rgba(92,46,67,.09);
-    color:var(--plum);border-radius:6px;padding:4px 10px;
+    letter-spacing:.08em;text-transform:uppercase;border-radius:6px;padding:4px 10px;
   }
-  .result-summary{color:var(--ink-soft);font-size:15px;margin:10px 0 18px;line-height:1.55}
-  .result-questions{display:flex;flex-direction:column;gap:0}
+  .cat-tag.primary{background:rgba(92,46,67,.12);color:var(--plum)}
+  .cat-tag.secondary{background:rgba(92,46,67,.05);color:var(--ink-soft);border:1px solid var(--line)}
+  .result-summary{color:var(--ink-soft);font-size:15px;margin:8px 0 18px;line-height:1.55}
+  .result-questions{display:flex;flex-direction:column;gap:6px}
   .result-q{
     font-family:"JetBrains Mono",monospace;font-size:12.5px;color:var(--ink);
     background:var(--porcelain);border:1px solid var(--line);border-radius:9px;
-    padding:10px 13px;display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;
+    padding:10px 13px;display:flex;gap:8px;align-items:flex-start;
   }
   .result-q::before{content:"›";color:var(--plum);font-weight:600;flex:none}
   .result-narrative{
@@ -165,10 +176,7 @@
     background:rgba(92,46,67,.055);border:1px dashed var(--plum);
     font-size:14px;color:var(--ink-soft);line-height:1.55;
   }
-  .result-fetch-warn{
-    font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--missing);
-    margin-top:10px;letter-spacing:.02em;
-  }
+  .result-fetch-warn{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--missing);margin-top:10px;letter-spacing:.02em}
 
   /* ---- shift band ---- */
   .band{background:var(--ink);color:var(--porcelain);padding:74px 0}
@@ -184,7 +192,7 @@
 
   /* ---- how ---- */
   .how{padding:84px 0}
-  .how h2{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(1.9rem,3.4vw,2.7rem);letter-spacing:-.01em;max-width:18ch;margin-bottom:48px}
+  .how h2{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(1.9rem,3.4vw,2.7rem);letter-spacing:-.01em;max-width:20ch;margin-bottom:48px}
   .how h2 em{font-style:italic;color:var(--plum)}
   .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
   .step-card{border-top:2px solid var(--plum);padding-top:18px}
@@ -230,9 +238,10 @@
 <!-- HERO -->
 <section class="wrap hero">
   <div class="hero-copy">
-    <p class="eyebrow">For skincare brands on Shopify</p>
-    <h1>Shoppers ask AI which serum to buy. Is it <em>recommending you?</em></h1>
-    <p class="lede">Enter your website URL for a free initial analysis — we'll identify your likely category, the buying questions shoppers are asking, and your visibility risk.</p>
+    <p class="eyebrow">Free AI visibility check</p>
+    <h1>When shoppers ask AI what to buy, does it <em>recommend your brand?</em></h1>
+    <p class="lede">Enter your website URL for a free initial analysis. We read your public page signals, identify your likely category, and show example AI-shopping questions where your visibility matters.</p>
+
     <div class="hero-cta">
 
       <!-- Step 1: URL input -->
@@ -253,7 +262,7 @@
             </select>
           </div>
         </div>
-        <p class="microcopy" style="margin-top:10px"><b>Free initial analysis.</b> No account needed.</p>
+        <p class="microcopy" style="margin-top:10px"><b>Free initial analysis.</b> No account needed. Based on public website signals only.</p>
       </div>
 
       <!-- Step 2: Loading -->
@@ -265,17 +274,46 @@
         </div>
       </div>
 
-      <!-- Step 3: Email capture (shown after results appear in right panel) -->
+      <!-- Step 3: Manual category fallback -->
+      <div id="step-fallback" class="step">
+        <div class="fallback-wrap">
+          <div class="fallback-notice">
+            <b>We could not fully read this website automatically.</b><br>
+            This can happen when a site uses bot protection, JavaScript rendering, or blocks external requests. You can still create an initial preview by selecting your category below.
+          </div>
+          <select id="fallback-category" class="fallback-select">
+            <option value="">— Select your category —</option>
+            <option value="fashion">Fashion &amp; apparel</option>
+            <option value="beauty">Beauty &amp; skincare</option>
+            <option value="homeware">Homeware &amp; décor</option>
+            <option value="food">Food &amp; drink</option>
+            <option value="supplements">Supplements &amp; wellness</option>
+            <option value="pets">Pet products</option>
+            <option value="fitness">Fitness &amp; sports</option>
+            <option value="baby-kids">Baby &amp; kids</option>
+            <option value="electronics">Electronics &amp; accessories</option>
+            <option value="professional-services">Professional services</option>
+            <option value="local-services">Local services</option>
+            <option value="general-retail">General retail / department store</option>
+            <option value="other">Other</option>
+          </select>
+          <button id="btn-manual" type="button" class="btn-full">Preview with this category →</button>
+          <button id="btn-retry" type="button" class="btn-ghost btn-full" style="margin-top:-4px">Try a different URL instead</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Email capture -->
       <div id="step-email" class="step">
-        <p style="font-family:'Newsreader',serif;font-size:1.15rem;margin-bottom:14px;line-height:1.3">Your initial analysis is ready. Enter your email to receive the <em>full visibility report.</em></p>
+        <p style="font-family:'Newsreader',serif;font-size:1.12rem;margin-bottom:14px;line-height:1.35">Your initial preview is ready. Enter your email to receive the <em>full visibility report.</em></p>
         <form class="email-form" id="hero-form" action="https://formspree.io/f/mojzkvgo" method="POST" data-form>
-          <input type="hidden" name="website_url" id="h-url">
-          <input type="hidden" name="brand_name" id="h-brand">
-          <input type="hidden" name="market" id="h-market">
-          <input type="hidden" name="category" id="h-category">
-          <input type="hidden" name="summary" id="h-summary">
-          <input type="hidden" name="questions" id="h-questions">
-          <input type="hidden" name="timestamp" id="h-timestamp">
+          <input type="hidden" name="website_url"  id="h-url">
+          <input type="hidden" name="brand_name"   id="h-brand">
+          <input type="hidden" name="market"       id="h-market">
+          <input type="hidden" name="primary_category" id="h-category">
+          <input type="hidden" name="all_categories"   id="h-categories">
+          <input type="hidden" name="summary"      id="h-summary">
+          <input type="hidden" name="questions"    id="h-questions">
+          <input type="hidden" name="timestamp"    id="h-timestamp">
           <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
           <button type="submit">Get report</button>
         </form>
@@ -286,21 +324,21 @@
     </div>
   </div>
 
-  <!-- Right panel: mock card initially, replaced by result after analysis -->
+  <!-- Right panel -->
   <div id="panel-right">
 
     <!-- Static mock (shown before analysis) -->
     <div id="panel-mock" class="answer-card" aria-label="Example AI shopping answer">
       <div class="ac-top"><span></span><span></span><span></span><em class="lbl">AI shopping answer</em></div>
       <div class="ac-body">
-        <div class="query">best vitamin C serum for sensitive, acne-prone skin under £40?</div>
+        <div class="query">best sustainable women's coat under £120 for everyday wear?</div>
         <p class="ans-label">Here are three well-reviewed options:</p>
-        <div class="rec"><span class="num">1</span><span class="name">Luma Bright C+</span><span class="tag">15% L-AA · calming</span></div>
-        <div class="rec"><span class="num">2</span><span class="name">Aurelle Daily Glow</span><span class="tag">THD ascorbate</span></div>
-        <div class="rec"><span class="num">3</span><span class="name">Verde Clear Serum</span><span class="tag">niacinamide blend</span></div>
+        <div class="rec"><span class="num">1</span><span class="name">Arket Wool Blend</span><span class="tag">recycled · warm</span></div>
+        <div class="rec"><span class="num">2</span><span class="name">Finisterre Trevose</span><span class="tag">ethical · durable</span></div>
+        <div class="rec"><span class="num">3</span><span class="name">People Tree Classic</span><span class="tag">fairtrade · versatile</span></div>
         <div class="absent">
           <span class="x">—</span>
-          <span class="t"><b>Your brand wasn't mentioned.</b><span>Across 30+ buying questions, the AI never put you on the list.</span></span>
+          <span class="t"><b>Your brand wasn't mentioned.</b><span>Across buying questions in your category, the AI never recommended you.</span></span>
         </div>
       </div>
     </div>
@@ -310,12 +348,12 @@
       <div class="result-card">
         <div class="ac-top"><span></span><span></span><span></span><em class="lbl" id="result-header">Initial analysis</em></div>
         <div class="ac-body">
-          <span class="result-badge" id="result-category">—</span>
+          <div class="category-tags" id="result-categories"></div>
           <p class="result-summary" id="result-summary"></p>
-          <p class="ans-label">Example AI shopping questions in your category</p>
+          <p class="ans-label">Example AI-shopping questions in your category</p>
           <div class="result-questions" id="result-questions"></div>
           <div class="result-narrative" id="result-narrative"></div>
-          <p class="result-fetch-warn" id="result-fetch-warn" style="display:none">⚠ Could not fetch your website directly — analysis based on URL signals only.</p>
+          <p class="result-fetch-warn" id="result-fetch-warn" style="display:none">⚠ Could not read this website directly — preview based on selected category.</p>
         </div>
       </div>
     </div>
@@ -327,38 +365,38 @@
 <section class="band">
   <div class="wrap">
     <div>
-      <h2>The shelf moved. <em>Most brands haven't.</em></h2>
-      <p>Buyers used to start at Google. Now they ask an AI to pick for them — and it names a handful of brands, not a page of links. If you're not in that handful, you don't get the click, the trial, or the customer.</p>
+      <h2>Buyers moved to AI. <em>Most brands haven't noticed.</em></h2>
+      <p>Shoppers used to start at Google. Now they ask an AI assistant to recommend a product — and it names a handful of brands, not a list of links. If your brand isn't in that shortlist, you don't get the click, the visit, or the sale.</p>
     </div>
     <div class="stats">
-      <div class="stat"><b>64%</b><span class="d"> of shoppers plan to buy through AI chatbots in 2026.</span></div>
-      <div class="stat"><b>#1</b><span class="d"> influence on what makes a buyer's shortlist — ahead of review sites and ads.</span></div>
-      <div class="stat"><b>~30%</b><span class="d"> of beauty shoppers already use AI to research what to buy.</span></div>
+      <div class="stat"><b>64%</b><span class="d"> of shoppers plan to buy through AI assistants in 2026.</span></div>
+      <div class="stat"><b>#1</b><span class="d"> influence on buyer shortlists — ahead of review sites and paid ads.</span></div>
+      <div class="stat"><b>~30%</b><span class="d"> of online shoppers already use AI to research purchases.</span></div>
     </div>
   </div>
 </section>
 
 <!-- HOW -->
 <section class="wrap how">
-  <h2>A plain-English check. <em>No dashboard to learn.</em></h2>
+  <h2>A plain-English preview. <em>No dashboard to learn.</em></h2>
   <div class="steps">
-    <div class="step-card"><div class="n">Step 01</div><h3>Enter your store URL</h3><p>We read your public website — title, description, headings — to identify your category and likely customers.</p></div>
-    <div class="step-card"><div class="n">Step 02</div><h3>See your initial analysis</h3><p>Example buying questions your category gets asked. A preview of where visibility gaps are likely. Based on public website signals.</p></div>
-    <div class="step-card"><div class="n">Step 03</div><h3>Get the full report</h3><p>Where you show up, who's beating you, and the fixes that actually move the needle. Emailed to you free.</p></div>
+    <div class="step-card"><div class="n">Step 01</div><h3>Enter your website URL</h3><p>We read your public page signals — title, description, headings — to identify your likely category and customer type.</p></div>
+    <div class="step-card"><div class="n">Step 02</div><h3>See your initial preview</h3><p>Example AI-shopping questions relevant to your category. A sense of where visibility gaps are likely. Based on public website signals only — this is not a live AI query.</p></div>
+    <div class="step-card"><div class="n">Step 03</div><h3>Get the full report</h3><p>The full report shows which specific queries your brand appears in, who's appearing instead, and the changes that are most likely to improve your visibility.</p></div>
   </div>
 </section>
 
 <!-- CLOSE -->
 <section class="wrap close">
   <div class="close-card">
-    <h2>See where you stand <em>before your competitors do.</em></h2>
-    <p>We're running free visibility checks for a first group of skincare brands. Ongoing monitoring will be £29/mo at launch — early-access brands lock that in.</p>
+    <h2>Find out where you stand <em>before your competitors do.</em></h2>
+    <p>We're running free visibility checks for an initial group of brands. Ongoing monitoring will be £29/mo at launch — early-access brands lock that in.</p>
     <form class="email-form" id="close-form" action="https://formspree.io/f/mojzkvgo" method="POST" data-form>
       <input type="hidden" name="source" value="close-section">
       <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
       <button type="submit">Reserve my free check</button>
     </form>
-    <p class="ok" id="close-ok" role="status">Thanks — you're on the early-access list. Your report's on the way.</p>
+    <p class="ok" id="close-ok" role="status">Thanks — you're on the early-access list. Your report is on its way.</p>
     <p class="microcopy"><b>Limited first group.</b> Free check + locked-in £29/mo if you continue.</p>
   </div>
 </section>
@@ -366,38 +404,35 @@
 <footer>
   <div class="wrap" style="display:flex;justify-content:space-between;width:100%;gap:18px;flex-wrap:wrap;padding:0 28px">
     <div class="brandmark"><span class="dot"></span>Visible</div>
-    <div>AI-visibility checks for skincare brands · Launching 2026 · Independent, not affiliated with any AI provider.</div>
+    <div>AI-visibility checks for online brands · Launching 2026 · Independent, not affiliated with any AI provider.</div>
   </div>
 </footer>
 
 <script>
 (function () {
-  // ── Shared email form handler (close section) ─────────────────────────────
-  document.querySelectorAll('[data-form]').forEach(function (f) {
-    f.addEventListener('submit', function (e) {
-      var ok = f.parentElement.querySelector('.ok');
-      if (f.id === 'hero-form') return; // handled separately below
-      e.preventDefault();
-      var endpoint = f.getAttribute('action');
-      if (endpoint) fetch(endpoint, { method: 'POST', body: new FormData(f), headers: { Accept: 'application/json' } }).catch(function () {});
-      f.classList.add('done');
-      if (ok) ok.classList.add('show');
-    });
+
+  // ── Close-section Formspree ───────────────────────────────────────────────
+  document.getElementById('close-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = this;
+    fetch(f.action, { method: 'POST', body: new FormData(f), headers: { Accept: 'application/json' } }).catch(function () {});
+    f.classList.add('done');
+    document.getElementById('close-ok').classList.add('show');
   });
 
-  // ── Hero form submit ───────────────────────────────────────────────────────
+  // ── Hero Formspree ────────────────────────────────────────────────────────
   document.getElementById('hero-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var f = this;
-    var endpoint = f.getAttribute('action');
-    if (endpoint) fetch(endpoint, { method: 'POST', body: new FormData(f), headers: { Accept: 'application/json' } }).catch(function () {});
+    fetch(f.action, { method: 'POST', body: new FormData(f), headers: { Accept: 'application/json' } }).catch(function () {});
     f.classList.add('done');
     document.getElementById('hero-ok').classList.add('show');
   });
 
-  // ── Analysis flow ──────────────────────────────────────────────────────────
+  // ── Step control ──────────────────────────────────────────────────────────
+  var STEPS = ['step-input', 'step-loading', 'step-fallback', 'step-email'];
   function showStep(id) {
-    ['step-input', 'step-loading', 'step-email'].forEach(function (s) {
+    STEPS.forEach(function (s) {
       document.getElementById(s).classList.toggle('active', s === id);
     });
   }
@@ -407,19 +442,28 @@
     if (label) document.getElementById('loading-label').textContent = label;
   }
 
-  function capLabel(text, max) {
-    return text && text.length > max ? text.slice(0, max - 1) + '…' : text;
-  }
-
+  // ── Render result ─────────────────────────────────────────────────────────
   function renderResult(data, inputUrl, brandName, market) {
     var name = brandName || data.title || inputUrl;
+    document.getElementById('result-header').textContent =
+      (name ? name.slice(0, 36) + (name.length > 36 ? '…' : '') + ' — ' : '') + 'initial preview';
 
-    document.getElementById('result-header').textContent = capLabel(name, 40) + ' — initial analysis';
-    document.getElementById('result-category').textContent = '📂 ' + (data.category || 'beauty');
+    // Category tags
+    var tagEl = document.getElementById('result-categories');
+    tagEl.innerHTML = '';
+    (data.categories || []).forEach(function (c) {
+      var t = document.createElement('span');
+      t.className = 'cat-tag ' + (c.primary ? 'primary' : 'secondary');
+      t.textContent = c.label;
+      tagEl.appendChild(t);
+    });
 
-    var summary = data.summary || 'Analysis based on public website signals.';
-    document.getElementById('result-summary').textContent = capLabel(summary, 180);
+    // Summary
+    var summary = data.summary || 'Initial analysis based on public website signals.';
+    document.getElementById('result-summary').textContent =
+      summary.length > 200 ? summary.slice(0, 197) + '…' : summary;
 
+    // Questions
     var qEl = document.getElementById('result-questions');
     qEl.innerHTML = '';
     (data.questions || []).forEach(function (q) {
@@ -429,63 +473,70 @@
       qEl.appendChild(d);
     });
 
+    // Narrative
     document.getElementById('result-narrative').textContent = data.riskNarrative || '';
 
-    if (!data.fetchedOk) {
+    // Fetch warning
+    if (!data.fetchedOk || data.manual) {
       document.getElementById('result-fetch-warn').style.display = 'block';
     }
 
     // Populate hidden Formspree fields
-    document.getElementById('h-url').value = inputUrl;
-    document.getElementById('h-brand').value = brandName;
-    document.getElementById('h-market').value = market;
-    document.getElementById('h-category').value = data.category || '';
-    document.getElementById('h-summary').value = capLabel(summary, 300);
+    document.getElementById('h-url').value       = inputUrl;
+    document.getElementById('h-brand').value     = brandName;
+    document.getElementById('h-market').value    = market;
+    document.getElementById('h-category').value  = data.primary || '';
+    document.getElementById('h-categories').value = (data.categories || []).map(function (c) { return c.label; }).join(', ');
+    document.getElementById('h-summary').value   = summary.slice(0, 300);
     document.getElementById('h-questions').value = (data.questions || []).join(' | ');
     document.getElementById('h-timestamp').value = new Date().toISOString();
 
     // Swap panels
-    document.getElementById('panel-mock').style.display = 'none';
+    document.getElementById('panel-mock').style.display   = 'none';
     document.getElementById('panel-result').style.display = 'block';
     showStep('step-email');
   }
 
-  function renderFallback(inputUrl, brandName, market) {
-    // No fetch, no API — show a generic but honest result
+  // ── Generic fallback (when API completely unreachable) ────────────────────
+  function renderHardFallback(inputUrl, brandName, market) {
     renderResult({
       fetchedOk: false,
-      category: 'beauty',
-      summary: 'We were unable to read your website directly. The full report will include a manual check of your public pages.',
+      manual: true,
+      title: brandName || inputUrl,
+      summary: 'We were unable to read this website. The full report will include a manual check of your public pages.',
+      primary: 'other',
+      categories: [{ key: 'other', label: 'General online brand', primary: true }],
       questions: [
-        'best moisturiser for dry skin',
-        'best cruelty-free serum',
-        'best vitamin C serum for sensitive skin',
-        'best skincare routine for beginners',
+        'best products in this category UK',
+        'most recommended brands online 2025',
+        'top-rated options for online shoppers',
+        'which brands do AI assistants recommend',
       ],
-      riskNarrative: 'When shoppers ask AI tools for beauty recommendations, they typically receive 3–5 brand names. Your full report will show which questions your brand appears in, and which competitors are named instead.',
+      riskNarrative: 'When shoppers ask AI assistants for product recommendations, they typically receive 3–5 brand names. The full report shows which queries are relevant to your brand and which competitors are appearing instead.',
     }, inputUrl, brandName, market);
   }
 
-  document.getElementById('btn-analyse').addEventListener('click', async function () {
-    var rawUrl = document.getElementById('input-url').value.trim();
-    var brandName = document.getElementById('input-brand').value.trim();
-    var market = document.getElementById('input-market').value;
+  // ── Analysis flow ─────────────────────────────────────────────────────────
+  var _inputUrl, _brandName, _market;
 
-    if (!rawUrl) {
-      document.getElementById('input-url').focus();
-      return;
-    }
+  async function runAnalysis(manualCategory) {
+    var rawUrl   = _inputUrl;
+    var brandName = _brandName;
+    var market   = _market;
+
+    var payload = { url: rawUrl, brandName: brandName, market: market };
+    if (manualCategory) payload.manualCategory = manualCategory;
 
     showStep('step-loading');
     setProgress(15, 'Fetching your website…');
 
-    var progressTimer = setInterval(function () {
+    var timer = setInterval(function () {
       var fill = document.getElementById('progress-fill');
       var cur = parseFloat(fill.style.width) || 15;
-      if (cur < 75) {
-        fill.style.width = (cur + 8) + '%';
+      if (cur < 78) {
+        fill.style.width = (cur + 7) + '%';
         if (cur > 30) document.getElementById('loading-label').textContent = 'Analysing page content…';
-        if (cur > 55) document.getElementById('loading-label').textContent = 'Identifying category and questions…';
+        if (cur > 58) document.getElementById('loading-label').textContent = 'Identifying category and questions…';
       }
     }, 600);
 
@@ -493,26 +544,61 @@
       var res = await fetch('/api/analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: rawUrl, brandName: brandName, market: market }),
+        body: JSON.stringify(payload),
       });
-
-      clearInterval(progressTimer);
+      clearInterval(timer);
       setProgress(100, 'Done.');
 
-      if (!res.ok) throw new Error('API error');
+      if (!res.ok) throw new Error('api-error');
       var data = await res.json();
 
-      setTimeout(function () { renderResult(data, rawUrl, brandName, market); }, 300);
+      setTimeout(function () {
+        if (data.needsManualCategory) {
+          showStep('step-fallback');
+        } else {
+          renderResult(data, rawUrl, brandName, market);
+        }
+      }, 300);
+
     } catch (err) {
-      clearInterval(progressTimer);
-      setTimeout(function () { renderFallback(rawUrl, brandName, market); }, 300);
+      clearInterval(timer);
+      // If API is unreachable (local dev, network error), show hard fallback
+      setTimeout(function () { renderHardFallback(rawUrl, brandName, market); }, 300);
     }
+  }
+
+  // ── Analyse button ────────────────────────────────────────────────────────
+  document.getElementById('btn-analyse').addEventListener('click', function () {
+    var rawUrl = document.getElementById('input-url').value.trim();
+    if (!rawUrl) { document.getElementById('input-url').focus(); return; }
+
+    _inputUrl  = rawUrl;
+    _brandName = document.getElementById('input-brand').value.trim();
+    _market    = document.getElementById('input-market').value;
+
+    runAnalysis(null);
   });
 
-  // Allow Enter key in URL field
   document.getElementById('input-url').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') document.getElementById('btn-analyse').click();
   });
+
+  // ── Manual category button ────────────────────────────────────────────────
+  document.getElementById('btn-manual').addEventListener('click', function () {
+    var cat = document.getElementById('fallback-category').value;
+    if (!cat) { document.getElementById('fallback-category').focus(); return; }
+    runAnalysis(cat);
+  });
+
+  // ── Retry button ──────────────────────────────────────────────────────────
+  document.getElementById('btn-retry').addEventListener('click', function () {
+    document.getElementById('input-url').value = '';
+    document.getElementById('input-brand').value = '';
+    document.getElementById('progress-fill').style.width = '0%';
+    showStep('step-input');
+    document.getElementById('input-url').focus();
+  });
+
 })();
 </script>
 
