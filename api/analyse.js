@@ -923,6 +923,26 @@ function readBody(req) {
   });
 }
 
+// ── In-memory result cache ─────────────────────────────────────────────────────
+// Persists across warm invocations of the same serverless instance.
+// Prevents repeated Gemini calls for the same URL within a warm window.
+const RESULT_CACHE = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function cacheGet(key) {
+  const entry = RESULT_CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) { RESULT_CACHE.delete(key); return null; }
+  return entry.data;
+}
+
+function cacheSet(key, data) {
+  if (RESULT_CACHE.size >= 50) {
+    RESULT_CACHE.delete(RESULT_CACHE.keys().next().value); // evict oldest
+  }
+  RESULT_CACHE.set(key, { data, ts: Date.now() });
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -935,6 +955,14 @@ module.exports = async (req, res) => {
   let { url: targetUrl, brandName = '', market = 'UK', manualCategory } = body;
   if (!targetUrl) return res.status(400).json({ error: 'url is required' });
   if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
+
+  // Return cached result if available (avoids redundant Gemini calls)
+  const cacheKey = targetUrl.toLowerCase().replace(/\/+$/, '');
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    console.log(`Cache hit: ${cacheKey}`);
+    return res.status(200).json({ ...cached, _cached: true });
+  }
 
   // Manual category override (from fallback UI)
   if (manualCategory && CATEGORY_DEFS[manualCategory]) {
@@ -1100,7 +1128,7 @@ module.exports = async (req, res) => {
     key: c, label: CATEGORY_DEFS[c]?.label || c, primary: c === primary,
   }));
 
-  res.status(200).json({
+  const responseData = {
     fetchedOk, needsManualCategory: false, analysis_status: analysisStatus,
     aiAssisted, manual: false,
     title: displayTitle, ogTitle: extracted.ogTitle, metaDescription: extracted.metaDesc,
@@ -1112,5 +1140,12 @@ module.exports = async (req, res) => {
     questions, questionsRich, weakEvidence, riskNarrative,
     geminiKeyPresent: !!process.env.GEMINI_API_KEY,
     ...aiExtras,
-  });
+  };
+
+  // Cache successful AI-assisted results to avoid redundant Gemini calls
+  if (aiAssisted && !weakEvidence) {
+    cacheSet(cacheKey, responseData);
+  }
+
+  res.status(200).json(responseData);
 };
