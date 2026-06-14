@@ -519,18 +519,10 @@
     var qEl = document.getElementById('result-questions');
     qEl.innerHTML = '';
 
-    // Weak evidence: no questions could be generated at all
-    if (data.weakEvidence) {
-      var weak = document.createElement('p');
-      weak.style.cssText = 'font-size:13px;color:var(--ink-soft);font-style:italic;margin:0';
-      weak.textContent = 'Unable to generate reliable questions from the available evidence.';
-      qEl.appendChild(weak);
-    }
-
-    // Rate-limit fallback: keyword questions shown, soft note below
-    var richQs = Array.isArray(data.questionsRich) && data.questionsRich.length > 0 && !data.weakEvidence
+    // Always show questions if we have them — never leave the panel blank
+    var richQs = Array.isArray(data.questionsRich) && data.questionsRich.length > 0
       ? data.questionsRich
-      : (!data.weakEvidence ? (data.questions || []).map(function(q){ return { question: q, search_intent: '' }; }) : []);
+      : (data.questions || []).map(function(q){ return { question: q, search_intent: '' }; });
     richQs.forEach(function (qObj) {
       var qText   = typeof qObj === 'string' ? qObj : (qObj.question || '');
       var intent  = typeof qObj === 'object' ? (qObj.search_intent || qObj.why_relevant || '') : '';
@@ -550,8 +542,8 @@
       qEl.appendChild(wrap);
     });
 
-    // Soft note when questions fell back due to rate limit
-    if (data.rateLimitFallback && !data.weakEvidence && richQs.length > 0) {
+    // Soft note when falling back to general questions
+    if (data.rateLimitFallback && richQs.length > 0) {
       var note = document.createElement('p');
       note.style.cssText = 'font-size:12px;color:var(--ink-soft);font-style:italic;margin:6px 0 0';
       note.textContent = 'Showing general category questions — AI busy, try again shortly for business-specific results.';
