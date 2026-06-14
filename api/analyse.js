@@ -558,8 +558,8 @@ Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & d
 Website signals:
 ${signalsBlock}`;
 
-  // Model fallback: flash-lite has 30 RPM vs flash's 15 RPM — better rate limit headroom
-  const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash'];
+  // flash-lite = 30 RPM (vs flash 15 RPM) — use as primary to halve rate-limit exposure
+  const MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash'];
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.2, maxOutputTokens: 3000 },
