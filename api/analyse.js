@@ -538,7 +538,7 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
   "allowed_topics": ["ONLY list topics drawn from products_or_services_found, customer_channels and public_signals above — questions must use ONLY these"],
   "likely_search_intents": ["5 specific reasons someone would search for this type of business — e.g. 'buying a gift', 'planning a pub visit', 'sourcing stock for a bar', 'finding local delivery', 'booking a brewery tour'"],
   "example_ai_shopping_questions": [
-    {"question": "SHORT SEARCH PHRASE — 4 to 10 words — typed by someone who has NEVER heard of this business and wants AI to recommend options. See QUESTION FORMAT rules below.", "search_intent": "the specific customer need or occasion driving this search e.g. 'trade buyer sourcing beer for a pub' or 'couple planning a Cornwall weekend'", "why_relevant": "one sentence naming product/channel/signal from allowed_topics used", "evidence_term": "single key term from allowed_topics"}
+    {"question": "CONVERSATIONAL SENTENCE as someone would type to ChatGPT or Perplexity. Start with 'find me', 'recommend', 'I'm looking for', 'where can I find', 'what's the best', or 'I need'. Include at least one specific constraint: location, occasion, who it's for, trade vs consumer, budget, or style preference. See QUESTION FORMAT rules below.", "search_intent": "the specific customer need, occasion or context: who is searching and why", "why_relevant": "one sentence naming product/channel/signal from allowed_topics", "evidence_term": "single key term from allowed_topics"}
   ],
   "visibility_gaps": ["missing info a buyer would want"],
   "confidence_score": 0.85
@@ -547,13 +547,15 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
 RULES:
 1. Extract products/services first. Classify from evidence — not assumptions. Brewery → "Food & drink". Dairy → "Food & drink". Skincare → "Beauty & skincare".
 2. allowed_topics: list ONLY topics found in the signals above. Do not add anything that was not on the website.
-3. SEARCH INTENT — before writing questions, identify 5 specific customer needs or occasions that would lead someone to search for this type of business. Be specific to the actual products and channels found. Examples of good intents: "trade buyer sourcing beer for a pub estate", "couple planning a brewery visit in Cornwall", "tourist looking for local craft beer to take home", "event organiser needing drinks wholesale", "foodie searching for award-winning regional beer".
-4. QUESTION FORMAT — THIS IS CRITICAL.
-   Each question must come from one of the likely_search_intents. Ask: what would that specific person type into an AI assistant?
-   Write as a SHORT SEARCH PHRASE (4–10 words). NOT a full sentence.
-   FORBIDDEN: the business name or brand name, "you", "your", "I", "my", "me", "tell me", "what does", "how does", "does X offer", "can I".
-   CORRECT: "craft beer wholesale supplier South West pubs" / "Cornish brewery with accommodation and tap room" / "award-winning ales delivered Cornwall" / "brewery experience gift South West"
-   WRONG: "What beers does St Austell Brewery offer?" / "Tell me about your heritage" / "Breweries with a long heritage in the South West" (too vague — add the specific intent)
+3. SEARCH INTENT — identify 5 specific customer types or occasions that would make someone search for this business. Be concrete: "pub landlord in Devon looking to restock with local ales", "couple planning a brewery weekend in Cornwall", "tourist wanting to take home award-winning local beer", "event planner needing drinks wholesale for a venue", "beer enthusiast looking for a tap room experience near Truro".
+4. QUESTION FORMAT — THIS IS CRITICAL. Read carefully.
+   Each question must reflect one of the likely_search_intents — written as that specific person would type to ChatGPT, Perplexity, or Claude.
+   Write as a FULL CONVERSATIONAL SENTENCE, not a keyword phrase.
+   Start with: "find me", "recommend", "I'm looking for", "where can I find", "what's the best", "I need", "can you suggest".
+   Include at least ONE specific constraint: location ("in Cornwall"), occasion ("for a gift"), trade context ("for my pub"), preference ("independent", "award-winning"), or who it's for ("for two people", "for a small bar").
+   FORBIDDEN: the business name, brand name, "you", "your", "tell me about".
+   CORRECT: "recommend an independent brewery in Cornwall that supplies pubs wholesale" / "I'm looking for a brewery in the South West with rooms I can book for a weekend" / "find me award-winning cask ales brewed in Cornwall that I can order for my bar" / "where can I book a brewery experience as a gift in the South West"
+   WRONG (keyword phrases — not how people talk to AI): "craft beer wholesale supplier South West pubs" / "award-winning beers South West heritage" / "South West pubs with accommodation"
 5. Each question must use a term from allowed_topics. evidence_term must appear in allowed_topics. Omit rather than invent.
 6. Do NOT write questions about: coffee, gin, pasta, chocolate, skincare, clothing, fitness, electronics — unless those appear in products_or_services_found.
 6. confidence_score: 0.6-0.75 if website blocked access.
