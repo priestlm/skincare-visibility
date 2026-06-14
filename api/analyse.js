@@ -1143,10 +1143,12 @@ module.exports = async (req, res) => {
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
       if (geminiRaw?._error) {
-        aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '' };
-        // Gemini key present but call failed â€” don't show generic category questions
-        // that are unrelated to this business. Show weak-evidence warning instead.
-        questions = []; questionsRich = []; weakEvidence = true;
+        const isRateLimit = String(geminiRaw._error).includes('429');
+        aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '', rateLimitFallback: isRateLimit };
+        // On rate limit, show keyword-based questions so the tool stays usable.
+        // On other errors, flag weak evidence.
+        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
+        if (!isRateLimit) weakEvidence = true;
       } else {
         questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
       }
@@ -1172,10 +1174,12 @@ module.exports = async (req, res) => {
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
       if (geminiRaw?._error) {
-        aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '' };
-        // Gemini key present but call failed â€” don't show generic category questions
-        // that are unrelated to this business. Show weak-evidence warning instead.
-        questions = []; questionsRich = []; weakEvidence = true;
+        const isRateLimit = String(geminiRaw._error).includes('429');
+        aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '', rateLimitFallback: isRateLimit };
+        // On rate limit, show keyword-based questions so the tool stays usable.
+        // On other errors, flag weak evidence.
+        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
+        if (!isRateLimit) weakEvidence = true;
       } else {
         questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
       }
