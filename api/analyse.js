@@ -2,15 +2,7 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
-// ── Future enhancement note ────────────────────────────────────────────────────
-// The next version of this function may call an AI API (e.g. Claude via Anthropic SDK)
-// using a secure Vercel environment variable (process.env.ANTHROPIC_API_KEY) to generate
-// richer summaries and more accurate category classification from scraped content.
-// No paid API call is made in this version — classification is keyword-based only.
-// ──────────────────────────────────────────────────────────────────────────────
-
 // ── Blocked/error page detection ─────────────────────────────────────────────
-// Phrases that indicate the response is a bot-block or error page, not real content.
 const BLOCKED_SIGNALS = [
   'access denied', 'forbidden', '403 forbidden', 'request blocked',
   'bot protection', 'just a moment', 'checking your browser',
@@ -18,8 +10,6 @@ const BLOCKED_SIGNALS = [
   'ray id', 'cf-ray', 'attention required', 'security check',
   'please enable cookies', 'are you human',
 ];
-
-// Titles that are definitively error pages regardless of body
 const BLOCKED_TITLES = [
   'access denied', 'forbidden', '403', 'error', 'blocked', 'just a moment',
   'attention required', 'bot check', 'security check',
@@ -29,23 +19,14 @@ function isBlockedPage(extracted) {
   const { title, bodyText } = extracted;
   const titleLower = (title || '').toLowerCase();
   const bodyLower = (bodyText || '').toLowerCase().slice(0, 2000);
-
-  // Title is a known error title
   if (BLOCKED_TITLES.some(t => titleLower === t || titleLower.startsWith(t + ' '))) return true;
-
-  // Body has a blocked signal and the content is thin (< 500 meaningful chars)
   const bodyMeaningful = bodyText.replace(/\s+/g, ' ').trim().length;
   if (bodyMeaningful < 500 && BLOCKED_SIGNALS.some(s => bodyLower.includes(s))) return true;
-
-  // Body text is nearly empty even though we fetched something
   if (bodyMeaningful < 100) return true;
-
   return false;
 }
 
 // ── Known-domain overrides ────────────────────────────────────────────────────
-// Domain overrides fire regardless of whether scraping succeeds or fails.
-// Add domains here to guarantee correct classification for major known retailers.
 const DOMAIN_OVERRIDES = {
   'sainsburys.co.uk': {
     primary: 'grocery',
@@ -224,7 +205,7 @@ const CATEGORY_DEFS = {
     ],
   },
   'general-retail': {
-    label: 'General retail',
+    label: 'General retail / department store',
     keywords: [
       'department store', 'superstore', 'retail', 'marketplace', 'gift', 'gifts', 'sale',
       'clearance', 'outlet', 'discount', 'offer', 'deals', 'multipack', 'bundle',
@@ -233,6 +214,39 @@ const CATEGORY_DEFS = {
     ],
   },
 };
+
+// Reverse map: Gemini label → internal key
+const LABEL_TO_KEY = {};
+for (const [key, def] of Object.entries(CATEGORY_DEFS)) {
+  LABEL_TO_KEY[def.label.toLowerCase()] = key;
+}
+// Extra aliases Gemini might use
+const LABEL_ALIASES = {
+  'fashion & apparel': 'fashion',
+  'beauty & skincare': 'beauty',
+  'homeware & décor': 'homeware',
+  'homeware & decor': 'homeware',
+  'food & drink': 'food',
+  'grocery & supermarket': 'grocery',
+  'supplements & wellness': 'supplements',
+  'pet products': 'pets',
+  'fitness & sports': 'fitness',
+  'baby & kids': 'baby-kids',
+  'electronics & accessories': 'electronics',
+  'electronics accessories': 'electronics',
+  'professional services': 'professional-services',
+  'local services': 'local-services',
+  'general retail': 'general-retail',
+  'general retail / department store': 'general-retail',
+  'department store': 'general-retail',
+  'other': 'other',
+};
+
+function labelToKey(label) {
+  if (!label) return null;
+  const lower = label.toLowerCase().trim();
+  return LABEL_TO_KEY[lower] || LABEL_ALIASES[lower] || null;
+}
 
 // ── Question templates per category ───────────────────────────────────────────
 const QUESTIONS = {
@@ -399,7 +413,6 @@ function extract(html) {
     if (t.length > 2 && t.length < 180) headings.push(t);
   }
 
-  // Extract nav/category link text — good category signal
   const navLinks = [];
   const navBlocks = html.match(/<nav[\s\S]{0,8000}?<\/nav>/gi) || [];
   navBlocks.forEach(nav => {
@@ -421,11 +434,9 @@ function extract(html) {
   return { title, metaDesc, ogTitle, ogDesc, headings, navLinks, bodyText };
 }
 
-// ── Category detection ────────────────────────────────────────────────────────
+// ── Category detection (rules-based fallback) ─────────────────────────────────
 function detectCategories(extracted) {
   const { title, metaDesc, ogTitle, ogDesc, headings, navLinks, bodyText } = extracted;
-
-  // Higher weight for title/OG (3×), meta/headings/navLinks (2×), body (1×)
   const corpus = [
     title.repeat ? title.repeat(3) : title + title + title,
     ogTitle.repeat ? ogTitle.repeat(3) : '',
@@ -460,7 +471,145 @@ function detectCategories(extracted) {
   return { primary, categories };
 }
 
-// ── Summary builder ───────────────────────────────────────────────────────────
+// ── Gemini AI classification ───────────────────────────────────────────────────
+function postJson(url, payload, timeout = 12000) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try { parsed = new URL(url); } catch { return reject(new Error('Invalid URL')); }
+    const body = JSON.stringify(payload);
+    const req = https.request({
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+        catch { resolve({ status: res.statusCode, body: data }); }
+      });
+    });
+    req.setTimeout(timeout, () => { req.destroy(); reject(new Error('timeout')); });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function callGemini(extracted, targetUrl, analysisStatus) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const { title, metaDesc, ogTitle, ogDesc, headings, navLinks, bodyText } = extracted;
+  const isBlocked = analysisStatus === 'blocked' || analysisStatus === 'failed';
+
+  const signalsBlock = isBlocked
+    ? `Note: The website blocked automated access. Only the URL/domain is available as a signal.
+URL: ${targetUrl}`
+    : [
+      `URL: ${targetUrl}`,
+      title       ? `Page title: ${title}` : '',
+      ogTitle     ? `OG title: ${ogTitle}` : '',
+      metaDesc    ? `Meta description: ${metaDesc}` : '',
+      ogDesc      ? `OG description: ${ogDesc}` : '',
+      headings.length ? `Headings: ${headings.slice(0, 8).join(' | ')}` : '',
+      navLinks.length ? `Navigation links: ${navLinks.slice(0, 20).join(', ')}` : '',
+      bodyText    ? `Body text snippet: ${bodyText.slice(0, 1200)}` : '',
+    ].filter(Boolean).join('\n');
+
+  const prompt = `You are an AI shopping visibility analyst. Based on the public website signals below, classify this business.
+
+Return ONLY a valid JSON object — no markdown, no code fences, no explanation. Use exactly these fields:
+
+{
+  "brand_name": "short brand name (string)",
+  "business_summary": "1–2 sentence plain-English description of what this business sells (string)",
+  "primary_category": "one of the categories listed below (string)",
+  "secondary_categories": ["array", "of", "additional", "matching", "categories"],
+  "likely_customer_type": "short phrase describing the typical shopper (string)",
+  "example_ai_shopping_questions": ["5 specific questions", "shoppers might ask AI assistants", "when looking for this type of product or service"],
+  "confidence_score": 0.0,
+  "analysis_notes": "brief note about classification confidence or any limitations (string)"
+}
+
+Supported categories (use exact strings):
+- Fashion & apparel
+- Beauty & skincare
+- Homeware & décor
+- Food & drink
+- Grocery & supermarket
+- Supplements & wellness
+- Pet products
+- Fitness & sports
+- Baby & kids
+- Electronics & accessories
+- Professional services
+- Local services
+- General retail / department store
+- Other
+
+Rules:
+- Do not claim to have checked ChatGPT, Gemini, Perplexity or Google AI-shopping results.
+- Use phrases like "initial preview", "likely category", "public website signals", "example AI-shopping questions".
+- confidence_score should be a number between 0.0 and 1.0.
+- If the website blocked access, use your knowledge of the brand from the URL/domain and set confidence_score lower (0.6–0.75).
+- Keep example_ai_shopping_questions specific and relevant to this brand/category.
+
+Website signals:
+${signalsBlock}`;
+
+  try {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const result = await postJson(endpoint, {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+    });
+
+    if (result.status !== 200) return null;
+
+    const text = result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    // Strip any accidental markdown fences
+    const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    // Validate required fields
+    if (!parsed.primary_category || !parsed.example_ai_shopping_questions) return null;
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+// ── Map Gemini result to our internal schema ───────────────────────────────────
+function applyGeminiResult(gemini, brandNameInput) {
+  const primaryKey = labelToKey(gemini.primary_category) || 'other';
+  const secondaryKeys = (gemini.secondary_categories || [])
+    .map(l => labelToKey(l))
+    .filter(Boolean)
+    .filter(k => k !== primaryKey);
+
+  const categories = [primaryKey, ...secondaryKeys].slice(0, 4);
+
+  // Use AI questions if provided and valid, otherwise fall back to template
+  const aiQuestions = Array.isArray(gemini.example_ai_shopping_questions)
+    ? gemini.example_ai_shopping_questions.filter(q => typeof q === 'string' && q.length > 5).slice(0, 5)
+    : [];
+  const questions = aiQuestions.length >= 3 ? aiQuestions : buildQuestions(categories);
+
+  const brandName = gemini.brand_name || brandNameInput || '';
+  const summary = gemini.business_summary || '';
+  const customerType = gemini.likely_customer_type || CUSTOMER_TYPES[primaryKey] || CUSTOMER_TYPES.other;
+
+  return { primaryKey, categories, questions, brandName, summary, customerType };
+}
+
+// ── Summary / narrative builders ──────────────────────────────────────────────
 function buildSummary(extracted, brandName) {
   const { title, metaDesc, ogDesc, headings } = extracted;
   const best = ogDesc || metaDesc;
@@ -530,6 +679,7 @@ module.exports = async (req, res) => {
       fetchedOk: false,
       needsManualCategory: false,
       manual: true,
+      aiAssisted: false,
       title: brandName || targetUrl,
       summary,
       primary: manualCategory,
@@ -545,7 +695,6 @@ module.exports = async (req, res) => {
 
   let extracted = { title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' };
   let fetchedOk = false;
-
   let analysisStatus = 'ok'; // ok | blocked | failed
 
   if (!override) {
@@ -572,11 +721,40 @@ module.exports = async (req, res) => {
     fetchedOk = true;
   }
 
-  // No override and blocked/failed → ask user to pick category manually
+  // No override and blocked/failed → try Gemini with domain-only signal, else ask user
   if (!override && (analysisStatus === 'blocked' || analysisStatus === 'failed')) {
+    // Attempt AI classification using just the URL/domain if Gemini key is available
+    const gemini = await callGemini(extracted, targetUrl, analysisStatus);
+    if (gemini) {
+      const { primaryKey, categories, questions, brandName: aiBrand, summary, customerType } = applyGeminiResult(gemini, brandName);
+      const riskNarrative = buildRiskNarrative(aiBrand || brandName, primaryKey, categories);
+      const categoryLabels = categories.map(c => ({
+        key: c,
+        label: CATEGORY_DEFS[c]?.label || c,
+        primary: c === primaryKey,
+      }));
+      return res.status(200).json({
+        fetchedOk: false,
+        needsManualCategory: false,
+        analysis_status: analysisStatus,
+        aiAssisted: true,
+        manual: false,
+        title: aiBrand || brandName || targetUrl,
+        summary,
+        primary: primaryKey,
+        categories: categoryLabels,
+        customerType,
+        questions,
+        riskNarrative,
+        confidence: gemini.confidence_score,
+        analysisNotes: gemini.analysis_notes,
+      });
+    }
+    // No Gemini key or Gemini failed — ask user to pick category manually
     return res.status(200).json({
       fetchedOk: false,
       needsManualCategory: true,
+      aiAssisted: false,
       analysis_status: analysisStatus,
       title: '',
       summary: '',
@@ -587,17 +765,48 @@ module.exports = async (req, res) => {
     });
   }
 
-  let primary, categories;
+  // ── Classify: try Gemini first, fall back to rules-based ─────────────────────
+  let primary, categories, summary, questions, customerType, aiAssisted = false;
+  let aiExtras = {};
+
   if (override) {
+    // Domain override — run Gemini on top of override signals for richer questions/summary
     ({ primary, categories } = override);
+    const gemini = await callGemini(extracted, targetUrl, 'ok');
+    if (gemini) {
+      const mapped = applyGeminiResult(gemini, brandName || extracted.title);
+      // Keep override categories but use AI questions and summary if better
+      questions = mapped.questions;
+      summary = mapped.summary || buildSummary(extracted, brandName || extracted.title);
+      customerType = mapped.customerType;
+      aiAssisted = true;
+      aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
+    } else {
+      questions = buildQuestions(categories);
+      summary = buildSummary(extracted, brandName || extracted.title);
+      customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
+    }
   } else {
-    ({ primary, categories } = detectCategories(extracted));
+    // Fetched ok — try Gemini, fall back to rules
+    const gemini = await callGemini(extracted, targetUrl, analysisStatus);
+    if (gemini) {
+      const mapped = applyGeminiResult(gemini, brandName || extracted.title);
+      primary = mapped.primaryKey;
+      categories = mapped.categories;
+      questions = mapped.questions;
+      summary = mapped.summary || buildSummary(extracted, brandName || extracted.title);
+      customerType = mapped.customerType;
+      aiAssisted = true;
+      aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
+    } else {
+      ({ primary, categories } = detectCategories(extracted));
+      questions = buildQuestions(categories);
+      summary = buildSummary(extracted, brandName || extracted.title);
+      customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
+    }
   }
 
-  const summary = buildSummary(extracted, brandName || extracted.title);
-  const questions = buildQuestions(categories);
   const riskNarrative = buildRiskNarrative(brandName || extracted.title, primary, categories);
-  const customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
   const categoryLabels = categories.map(c => ({
     key: c,
     label: CATEGORY_DEFS[c]?.label || c,
@@ -608,6 +817,7 @@ module.exports = async (req, res) => {
     fetchedOk,
     needsManualCategory: false,
     analysis_status: analysisStatus,
+    aiAssisted,
     manual: false,
     title: extracted.title || extracted.ogTitle,
     ogTitle: extracted.ogTitle,
@@ -618,5 +828,6 @@ module.exports = async (req, res) => {
     customerType,
     questions,
     riskNarrative,
+    ...aiExtras,
   });
 };
