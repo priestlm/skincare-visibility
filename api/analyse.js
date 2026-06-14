@@ -536,8 +536,9 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
   "target_customer_type": "short phrase",
   "market_or_location_signals": "e.g. Cornwall UK, South West, nationwide — empty if none",
   "allowed_topics": ["ONLY list topics drawn from products_or_services_found, customer_channels and public_signals above — questions must use ONLY these"],
+  "likely_search_intents": ["5 specific reasons someone would search for this type of business — e.g. 'buying a gift', 'planning a pub visit', 'sourcing stock for a bar', 'finding local delivery', 'booking a brewery tour'"],
   "example_ai_shopping_questions": [
-    {"question": "SHORT SEARCH PHRASE — 4 to 10 words — typed by someone who has NEVER heard of this business and wants AI to recommend options. See QUESTION FORMAT rules below.", "why_relevant": "one sentence naming product/channel/signal used", "evidence_term": "single key term from allowed_topics"}
+    {"question": "SHORT SEARCH PHRASE — 4 to 10 words — typed by someone who has NEVER heard of this business and wants AI to recommend options. See QUESTION FORMAT rules below.", "search_intent": "the specific customer need or occasion driving this search e.g. 'trade buyer sourcing beer for a pub' or 'couple planning a Cornwall weekend'", "why_relevant": "one sentence naming product/channel/signal from allowed_topics used", "evidence_term": "single key term from allowed_topics"}
   ],
   "visibility_gaps": ["missing info a buyer would want"],
   "confidence_score": 0.85
@@ -546,15 +547,15 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
 RULES:
 1. Extract products/services first. Classify from evidence — not assumptions. Brewery → "Food & drink". Dairy → "Food & drink". Skincare → "Beauty & skincare".
 2. allowed_topics: list ONLY topics found in the signals above. Do not add anything that was not on the website.
-3. QUESTION FORMAT — THIS IS CRITICAL. Read carefully.
-   The searcher has NEVER heard of this business. They are asking an AI for a recommendation.
-   Write each question as a SHORT SEARCH PHRASE (4–10 words), not a full sentence.
-   FORBIDDEN in every question: the business name, brand name, "you", "your", "I", "my", "me", "tell me", "what does", "how does", "does X offer".
-   CORRECT format examples: "best cask ale brewery Cornwall" / "independent brewery with pubs South West" / "drinks wholesaler for pubs in Cornwall" / "South West brewery tours and accommodation"
-   WRONG format examples: "What beers does St Austell Brewery offer?" / "Tell me about your heritage" / "How can my business set up an account?" / "What types of beer does St Austell offer?"
-   If you find yourself writing the brand name or a question word at the start, STOP and rewrite as a short phrase.
-4. Each question must use a term from allowed_topics. evidence_term must appear in allowed_topics. Omit rather than invent.
-5. Do NOT write questions about: coffee, gin, pasta, chocolate, skincare, clothing, fitness, electronics — unless those appear in products_or_services_found.
+3. SEARCH INTENT — before writing questions, identify 5 specific customer needs or occasions that would lead someone to search for this type of business. Be specific to the actual products and channels found. Examples of good intents: "trade buyer sourcing beer for a pub estate", "couple planning a brewery visit in Cornwall", "tourist looking for local craft beer to take home", "event organiser needing drinks wholesale", "foodie searching for award-winning regional beer".
+4. QUESTION FORMAT — THIS IS CRITICAL.
+   Each question must come from one of the likely_search_intents. Ask: what would that specific person type into an AI assistant?
+   Write as a SHORT SEARCH PHRASE (4–10 words). NOT a full sentence.
+   FORBIDDEN: the business name or brand name, "you", "your", "I", "my", "me", "tell me", "what does", "how does", "does X offer", "can I".
+   CORRECT: "craft beer wholesale supplier South West pubs" / "Cornish brewery with accommodation and tap room" / "award-winning ales delivered Cornwall" / "brewery experience gift South West"
+   WRONG: "What beers does St Austell Brewery offer?" / "Tell me about your heritage" / "Breweries with a long heritage in the South West" (too vague — add the specific intent)
+5. Each question must use a term from allowed_topics. evidence_term must appear in allowed_topics. Omit rather than invent.
+6. Do NOT write questions about: coffee, gin, pasta, chocolate, skincare, clothing, fitness, electronics — unless those appear in products_or_services_found.
 6. confidence_score: 0.6-0.75 if website blocked access.
 
 Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
@@ -775,10 +776,10 @@ function applyGeminiResult(gemini, brandNameInput) {
     ? gemini.example_ai_shopping_questions
     : [];
 
-  // Normalise to [{question, why_relevant, evidence_term}]
+  // Normalise to [{question, why_relevant, search_intent, evidence_term}]
   const normalisedQs = rawAiQs.map(q => {
-    if (typeof q === 'string') return { question: q, why_relevant: '', evidence_term: '' };
-    if (q && typeof q.question === 'string') return { question: q.question, why_relevant: q.why_relevant || '', evidence_term: q.evidence_term || '' };
+    if (typeof q === 'string') return { question: q, why_relevant: '', search_intent: '', evidence_term: '' };
+    if (q && typeof q.question === 'string') return { question: q.question, why_relevant: q.why_relevant || '', search_intent: q.search_intent || '', evidence_term: q.evidence_term || '' };
     return null;
   }).filter(Boolean).filter(q => q.question.length > 5).slice(0, 5);
 

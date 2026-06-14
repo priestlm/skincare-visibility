@@ -534,8 +534,8 @@
       ? data.questionsRich
       : (!data.weakEvidence ? (data.questions || []).map(function(q){ return { question: q, why_relevant: '' }; }) : []);
     richQs.forEach(function (qObj) {
-      var qText = typeof qObj === 'string' ? qObj : (qObj.question || '');
-      var why   = typeof qObj === 'object' ? (qObj.why_relevant || '') : '';
+      var qText   = typeof qObj === 'string' ? qObj : (qObj.question || '');
+      var intent  = typeof qObj === 'object' ? (qObj.search_intent || qObj.why_relevant || '') : '';
       if (!qText) return;
       var wrap = document.createElement('div');
       wrap.style.marginBottom = '6px';
@@ -543,10 +543,10 @@
       d.className = 'result-q';
       d.textContent = qText;
       wrap.appendChild(d);
-      if (why) {
+      if (intent) {
         var w = document.createElement('p');
         w.className = 'result-q-why';
-        w.textContent = why;
+        w.textContent = intent;
         wrap.appendChild(w);
       }
       qEl.appendChild(wrap);
