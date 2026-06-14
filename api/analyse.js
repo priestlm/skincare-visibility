@@ -642,7 +642,7 @@ ${signalsBlock}`;
   try {
     for (const model of MODELS) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      result = await postJson(endpoint, payload);
+      result = await postJson(endpoint, payload, 25000);
       usedModel = model;
       if (result.status === 200) break;
       // On 429 or 404 try the next model; on other errors stop immediately
