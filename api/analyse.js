@@ -521,112 +521,37 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
       bodyText    ? `Body text snippet: ${bodyText.slice(0, 1200)}` : '',
     ].filter(Boolean).join('\n');
 
-  const prompt = `You are an AI shopping and search visibility analyst. Analyse the public website signals below and produce a structured business profile.
-
-Return ONLY a valid JSON object — no markdown, no code fences, no explanation. Use exactly these fields:
+  const prompt = `Analyse the website signals below. Return ONLY a valid JSON object — no markdown, no fences.
 
 {
-  "organisation_name": "legal or trading name — NOT a blog post title or page heading",
-  "brand_name": "short name shoppers would search for",
-  "business_summary": "2–3 sentence plain-English summary written in your own words — do NOT copy page text verbatim",
-  "primary_category": "one exact category from the list below",
+  "organisation_name": "trading name only — not a page title or blog heading",
+  "brand_name": "short searchable name",
+  "business_summary": "2-3 sentences in your own words — do not copy page text",
+  "primary_category": "one exact value from the category list",
   "secondary_categories": [],
-  "detected_niche": "specific sub-type within primary category, e.g. Cornish clotted cream, Speciality coffee roaster, Clinical skincare — empty string if none",
-  "products_or_services_found": [
-    { "category": "category label", "examples": ["specific product 1", "specific product 2"] }
-  ],
-  "customer_channels": [
-    { "channel": "e.g. Direct ecommerce / Foodservice trade / Local retail / Hospitality venues", "reason": "one sentence citing the specific nav link, heading or text that supports this" }
-  ],
-  "public_signals": ["award or certification found", "heritage or provenance claim", "sustainability note", "production capability", "location or region", "delivery area"],
+  "detected_niche": "specific sub-type e.g. Cornish cask ale brewery, Speciality coffee roaster — empty if none",
+  "products_or_services_found": [{"category": "specific label", "examples": ["named product 1", "named product 2"]}],
+  "customer_channels": [{"channel": "e.g. On-trade pub supply / Direct ecommerce / Foodservice", "reason": "one sentence citing specific evidence found"}],
+  "public_signals": ["award", "heritage claim", "location", "sustainability note", "years trading"],
   "target_customer_type": "short phrase",
-  "market_or_location_signals": "e.g. Cornwall UK, London, nationwide UK — empty string if none",
-  "question_evidence_inventory": {
-    "allowed_product_terms": ["every product and service type found — these are the ONLY topics questions may cover"],
-    "allowed_channel_terms": ["every sales channel found, e.g. pub trade, ecommerce, wholesale, foodservice"],
-    "allowed_location_terms": ["every location or region found, e.g. Cornwall, South West, nationwide UK"],
-    "allowed_signal_terms": ["heritage claims, awards, sustainability, production method, stockist type"]
-  },
+  "market_or_location_signals": "e.g. Cornwall UK, South West, nationwide — empty if none",
+  "allowed_topics": ["ONLY list topics drawn from products_or_services_found, customer_channels and public_signals above — questions must use ONLY these"],
   "example_ai_shopping_questions": [
-    {
-      "question": "question a real buyer, trade customer or visitor would ask an AI assistant",
-      "why_relevant": "one sentence naming the specific product, channel or signal from question_evidence_inventory that this question draws from",
-      "evidence_term": "the single most important term from question_evidence_inventory that this question relies on"
-    }
+    {"question": "question a real buyer or trade customer would ask an AI assistant", "why_relevant": "names the specific product/channel/signal it draws from", "evidence_term": "single key term from allowed_topics"}
   ],
-  "visibility_gaps": ["information that is missing or unclear from the public signals — things a buyer would want to know but cannot find"],
-  "confidence_score": 0.85,
-  "evidence_used": "brief note on which signals drove classification"
+  "visibility_gaps": ["missing info a buyer would want"],
+  "confidence_score": 0.85
 }
 
-EIGHT-STEP PROCESS — follow this order exactly:
+RULES:
+1. Extract products/services first. Classify from evidence — not assumptions. Brewery → "Food & drink". Dairy → "Food & drink". Skincare → "Beauty & skincare".
+2. allowed_topics: list ONLY topics found in the signals above. Do not add anything that was not on the website.
+3. Write 5 questions using ONLY allowed_topics. Questions must reference a real product, channel, location or signal found on this website.
+4. evidence_term must appear in allowed_topics. If a question cannot be tied to allowed_topics, omit it rather than invent one.
+5. Do NOT write questions about: coffee, gin, pasta, chocolate, skincare, clothing, fitness, electronics — unless those appear in products_or_services_found.
+6. confidence_score: 0.6-0.75 if website blocked access.
 
-STEP 1 — READ AND SUMMARISE.
-Write business_summary in your own words. Do not copy meta descriptions or headings verbatim. Identify organisation_name from the trading name, not blog post titles or page headings.
-
-STEP 2 — EXTRACT PRODUCTS AND SERVICES.
-List every distinct product category and specific named examples found in the signals. Be precise — not generic.
-GOOD: [{category:"Cask ales and lagers", examples:["Tribute Pale Ale","Korev Lager","HSD"]}]
-BAD:  [{category:"Food and drink", examples:["drinks","products"]}]
-If no products are clearly named, describe the service type instead.
-
-STEP 3 — CLASSIFY.
-primary_category must follow from products_or_services_found, not from the company name alone.
-- Dairy producer → "Food & drink"
-- Brewery → "Food & drink"
-- Skincare brand → "Beauty & skincare"
-Never assign "General retail" to a specialist producer without clear evidence of broad retail.
-
-STEP 4 — IDENTIFY CUSTOMER CHANNELS.
-List only channels you can directly evidence from nav links, headings, or body text:
-ecommerce shop, wholesale/trade enquiry, foodservice supply, hospitality venues, local retail, visitor experiences, national delivery.
-Each channel needs a one-sentence reason citing specific website evidence.
-
-STEP 5 — NOTE PUBLIC SIGNALS.
-List only signals explicitly present: awards, certifications, heritage claims, sustainability statements, production facts, named stockists, delivery areas, years established, family/local ownership claims.
-
-STEP 6 — BUILD EVIDENCE INVENTORY.
-Complete question_evidence_inventory using ONLY what you found in Steps 2–5.
-This inventory defines every topic that questions are PERMITTED to cover.
-Do not add topics that were not found in the website signals.
-
-STEP 7 — GENERATE EVIDENCE-BASED QUESTIONS.
-Write exactly 5 questions. Each question MUST:
-a) Reference at least one term from question_evidence_inventory (allowed_product_terms OR allowed_channel_terms OR allowed_location_terms OR allowed_signal_terms)
-b) Be the kind of question a real buyer, trade customer or visitor would ask an AI assistant about this specific business
-c) Include a why_relevant sentence naming the inventory term it uses
-d) Include an evidence_term naming the single most important inventory term
-
-Topics NOT allowed unless found in question_evidence_inventory:
-- Coffee, tea, chocolate, gin, whisky, wine, pasta, bakery, skincare, clothing, tourism, electronics, pets, fitness — unless this specific business sells those things
-
-STEP 8 — VALIDATE QUESTIONS.
-For each of the 5 questions, check: does evidence_term appear in question_evidence_inventory?
-If NO → delete the question and write a new one that does use an inventory term.
-If fewer than 5 inventory-supported questions are possible, write as many as the evidence supports and leave the rest out.
-
-STRICT RULES:
-- secondary_categories: only if the website clearly sells those products. Never add "General retail" to a specialist.
-- detected_niche: be specific ("Cornish cask ale brewery" not just "brewery").
-- organisation_name: trading name only.
-- visibility_gaps: things a buyer needs but cannot find on the public website.
-
-CORRECT EXAMPLES:
-- St Austell Brewery: products=[{category:"Cask ales and lagers",examples:["Tribute Pale Ale","Korev"]}], channels=[{channel:"On-trade pub supply",reason:"trade page in nav"},{channel:"Visitor experiences",reason:"brewery tours listed"}], inventory={products:["cask ale","lager","beer"],channels:["pub trade","wholesale","brewery tours"],location:["Cornwall","South West"]}, questions about beer, pub supply, Cornwall, brewery tours
-- Ehrmann Cornish Dairy: products=[{category:"Dairy desserts",examples:["yoghurt","clotted cream","dairy desserts"]}], questions about dairy, desserts, clotted cream, foodservice, Cornish provenance
-- Next.co.uk: products=[clothing,homeware], questions about fashion and homeware ONLY
-
-INCORRECT (never do this):
-- St Austell Brewery → questions about coffee, chocolate, gin, pasta, skincare ✗
-- Cornish dairy → questions about craft beer or clothing ✗
-- Any specialist → questions drawn from broad category bank rather than extracted products ✗
-
-Supported primary_category values (use exact strings):
-Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
-
-Additional rules:
-- confidence_score: 0.0–1.0. Use 0.6–0.75 if website blocked access.
-- If access was blocked, infer from URL/domain and general brand knowledge only, and note this in evidence_used.
+Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
 
 Website signals:
 ${signalsBlock}`;
@@ -879,7 +804,14 @@ function applyGeminiResult(gemini, brandNameInput) {
   if (locationSignals) locationSignals.toLowerCase().split(/[\s,\/]+/).filter(w => w.length > 2 && !STOP_WORDS.has(w)).forEach(w => evidenceTerms.add(w));
   nicheLower.split(/[\s\/,]+/).filter(w => w.length > 3 && !STOP_WORDS.has(w)).forEach(w => evidenceTerms.add(w));
 
-  // Also absorb Gemini's own evidence inventory if present
+  // Also absorb Gemini's evidence inventory (flat allowed_topics array or legacy object)
+  const allowedTopics = Array.isArray(gemini.allowed_topics) ? gemini.allowed_topics : [];
+  for (const item of allowedTopics) {
+    if (typeof item === 'string') {
+      item.toLowerCase().split(/[\s\/,&]+/).filter(w => w.length > 3 && !STOP_WORDS.has(w)).forEach(w => evidenceTerms.add(w));
+    }
+  }
+  // Legacy: question_evidence_inventory object
   const inv = gemini.question_evidence_inventory;
   if (inv && typeof inv === 'object') {
     for (const list of Object.values(inv)) {
