@@ -537,7 +537,7 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
   "market_or_location_signals": "e.g. Cornwall UK, South West, nationwide — empty if none",
   "allowed_topics": ["ONLY list topics drawn from products_or_services_found, customer_channels and public_signals above — questions must use ONLY these"],
   "example_ai_shopping_questions": [
-    {"question": "search query typed by someone who does NOT know this business and is asking an AI for recommendations — no brand names, no 'you/your', discovery style only", "why_relevant": "names the specific product/channel/signal it draws from", "evidence_term": "single key term from allowed_topics"}
+    {"question": "SHORT SEARCH PHRASE — 4 to 10 words — typed by someone who has NEVER heard of this business and wants AI to recommend options. See QUESTION FORMAT rules below.", "why_relevant": "one sentence naming product/channel/signal used", "evidence_term": "single key term from allowed_topics"}
   ],
   "visibility_gaps": ["missing info a buyer would want"],
   "confidence_score": 0.85
@@ -546,12 +546,15 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
 RULES:
 1. Extract products/services first. Classify from evidence — not assumptions. Brewery → "Food & drink". Dairy → "Food & drink". Skincare → "Beauty & skincare".
 2. allowed_topics: list ONLY topics found in the signals above. Do not add anything that was not on the website.
-3. Write 5 questions from the perspective of a searcher who does NOT know this business exists. They are asking an AI assistant for recommendations. This business should appear as a result.
-4. Question style: short, natural search queries. NO brand names. NO "you/your". NO "I want to know about X". Use discovery phrasing: "best [product] in [location]", "[product type] supplier for [customer type]", "where to find [product] in [region]".
-5. Each question must use a term from allowed_topics. evidence_term must appear in allowed_topics. Omit rather than invent.
-6. Do NOT write questions about: coffee, gin, pasta, chocolate, skincare, clothing, fitness, electronics — unless those appear in products_or_services_found.
-7. WRONG style (brand-aware): "What beers does St Austell Brewery offer?" / "Tell me about your heritage"
-   RIGHT style (discovery): "best cask ale brewery in Cornwall" / "South West brewery with accommodation and pub visits"
+3. QUESTION FORMAT — THIS IS CRITICAL. Read carefully.
+   The searcher has NEVER heard of this business. They are asking an AI for a recommendation.
+   Write each question as a SHORT SEARCH PHRASE (4–10 words), not a full sentence.
+   FORBIDDEN in every question: the business name, brand name, "you", "your", "I", "my", "me", "tell me", "what does", "how does", "does X offer".
+   CORRECT format examples: "best cask ale brewery Cornwall" / "independent brewery with pubs South West" / "drinks wholesaler for pubs in Cornwall" / "South West brewery tours and accommodation"
+   WRONG format examples: "What beers does St Austell Brewery offer?" / "Tell me about your heritage" / "How can my business set up an account?" / "What types of beer does St Austell offer?"
+   If you find yourself writing the brand name or a question word at the start, STOP and rewrite as a short phrase.
+4. Each question must use a term from allowed_topics. evidence_term must appear in allowed_topics. Omit rather than invent.
+5. Do NOT write questions about: coffee, gin, pasta, chocolate, skincare, clothing, fitness, electronics — unless those appear in products_or_services_found.
 6. confidence_score: 0.6-0.75 if website blocked access.
 
 Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
