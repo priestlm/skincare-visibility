@@ -572,7 +572,7 @@ async function callGemini(prompt) {
   try {
     for (const model of MODELS) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      result = await postJson(endpoint, payload, 25000);
+      result = await postJson(endpoint, payload, 12000);
       usedModel = model;
       if (result.status === 200) break;
       // On 429 or 404 try the next model; on other errors stop immediately
@@ -605,7 +605,7 @@ async function callGemini(prompt) {
 }
 
 // â”€â”€ OpenAI-compatible chat helper (used by Groq + OpenRouter) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName) {
+async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, timeout = 25000) {
   const payload = {
     model,
     messages: [
@@ -616,7 +616,7 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName) {
     max_tokens: 3000,
   };
   try {
-    const result = await postJson(endpoint, payload, 25000, { Authorization: `Bearer ${apiKey}` });
+    const result = await postJson(endpoint, payload, timeout, { Authorization: `Bearer ${apiKey}` });
     if (result.status !== 200) {
       console.error(`${providerName} error`, result.status, JSON.stringify(result.body).slice(0, 200));
       return { _error: `${providerName.toLowerCase()}_status_${result.status}` };
@@ -647,15 +647,14 @@ async function callOpenRouter(prompt) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) return null;
   const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-  // Current free models (June 2026) — try in order
+  // Small/fast free models — stay within the 45s function budget
   const models = [
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'nvidia/nemotron-3-super-120b-a12b:free',
     'openai/gpt-oss-20b:free',
+    'meta-llama/llama-3.2-3b-instruct:free',
   ];
   let lastErr;
   for (const model of models) {
-    const result = await callOpenAICompat(endpoint, model, apiKey, prompt, `OpenRouter(${model})`);
+    const result = await callOpenAICompat(endpoint, model, apiKey, prompt, `OpenRouter(${model})`, 18000);
     if (result && !result._error) return result;
     lastErr = result;
     const errStr = result?._error || '';
