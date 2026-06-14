@@ -635,7 +635,7 @@ ${signalsBlock}`;
   const MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-lite'];
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 2000 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
   };
 
   let result, usedModel;
