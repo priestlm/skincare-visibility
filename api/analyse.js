@@ -547,15 +547,16 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
 RULES:
 1. Extract products/services first. Classify from evidence — not assumptions. Brewery → "Food & drink". Dairy → "Food & drink". Skincare → "Beauty & skincare".
 2. allowed_topics: list ONLY topics found in the signals above. Do not add anything that was not on the website.
-3. SEARCH INTENT — identify 5 specific customer types or occasions that would make someone search for this business. Be concrete: "pub landlord in Devon looking to restock with local ales", "couple planning a brewery weekend in Cornwall", "tourist wanting to take home award-winning local beer", "event planner needing drinks wholesale for a venue", "beer enthusiast looking for a tap room experience near Truro".
+3. SEARCH INTENT — identify 5 specific customer types or occasions that would make someone search for this business. Think about real people with a real need: "a pub landlord in Devon who needs to restock", "a couple looking for something to do in Cornwall for the weekend", "someone buying a beer gift for their dad", "a bar manager looking for local suppliers", "someone who just moved to the area and wants to find local producers".
 4. QUESTION FORMAT — THIS IS CRITICAL. Read carefully.
-   Each question must reflect one of the likely_search_intents — written as that specific person would type to ChatGPT, Perplexity, or Claude.
-   Write as a FULL CONVERSATIONAL SENTENCE, not a keyword phrase.
-   Start with: "find me", "recommend", "I'm looking for", "where can I find", "what's the best", "I need", "can you suggest".
-   Include at least ONE specific constraint: location ("in Cornwall"), occasion ("for a gift"), trade context ("for my pub"), preference ("independent", "award-winning"), or who it's for ("for two people", "for a small bar").
+   Imagine a real person sitting at their laptop typing a question into ChatGPT or asking Alexa. They are NOT writing marketing copy. They talk casually, in plain English, as if asking a friend.
+   Write as a FULL NATURAL SENTENCE — the kind of thing someone would actually say out loud.
+   Start with: "find me", "I'm looking for", "where can I get", "can you recommend", "what's a good", "do you know", "I need", "can you suggest".
+   Include a real-life detail that explains WHY they're searching: who it's for, what occasion, where they are, what they're trying to do.
+   Use plain everyday words. DO NOT use: marketing adjectives ("award-winning", "premium", "renowned", "artisan", "finest"), formal industry terms ("wholesaler", "on-trade", "hospitality supplier"), or brand/business names.
    FORBIDDEN: the business name, brand name, "you", "your", "tell me about".
-   CORRECT: "recommend an independent brewery in Cornwall that supplies pubs wholesale" / "I'm looking for a brewery in the South West with rooms I can book for a weekend" / "find me award-winning cask ales brewed in Cornwall that I can order for my bar" / "where can I book a brewery experience as a gift in the South West"
-   WRONG (keyword phrases — not how people talk to AI): "craft beer wholesale supplier South West pubs" / "award-winning beers South West heritage" / "South West pubs with accommodation"
+   GOOD (how real people actually talk): "I'm looking for a local brewery in Cornwall that sells to pubs — any recommendations?" / "where can I get Cornish beer delivered to my door?" / "can you suggest a nice brewery to visit near Truro for a day out?" / "I need to find somewhere in Cornwall that does bulk beer for my bar" / "what's a good place near St Austell to take my dad who loves trying local ales?"
+   BAD (sounds like a marketing brief, not a real person): "recommend an independent brewery in Cornwall that supplies pubs wholesale" / "find me award-winning cask ales brewed in Cornwall that I can order for my bar" / "where can I book a brewery experience as a gift in the South West"
 5. Each question must use a term from allowed_topics. evidence_term must appear in allowed_topics. Omit rather than invent.
 6. Do NOT write questions about: coffee, gin, pasta, chocolate, skincare, clothing, fitness, electronics — unless those appear in products_or_services_found.
 6. confidence_score: 0.6-0.75 if website blocked access.
