@@ -604,58 +604,71 @@ async function callGemini(prompt) {
   }
 }
 
-// â”€â”€ Groq fallback (free tier: 14,400 RPD â€” 10Ã— Gemini free tier) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function callGroq(prompt) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return null;
-
+// â”€â”€ OpenAI-compatible chat helper (used by Groq + OpenRouter) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName) {
   const payload = {
-    model: 'llama-3.1-8b-instant',
+    model,
     messages: [
-      { role: 'system', content: 'You are a business analyst. Return only valid JSON â€” no markdown, no code fences.' },
-      { role: 'user', content: prompt },
+      { role: ‘system’, content: ‘You are a business analyst. Return only valid JSON — no markdown, no code fences.’ },
+      { role: ‘user’, content: prompt },
     ],
     temperature: 0.2,
     max_tokens: 3000,
-    response_format: { type: 'json_object' },
+    response_format: { type: ‘json_object’ },
   };
-
   try {
-    const result = await postJson(
-      'https://api.groq.com/openai/v1/chat/completions',
-      payload,
-      25000,
-      { Authorization: `Bearer ${apiKey}` },
-    );
+    const result = await postJson(endpoint, payload, 25000, { Authorization: `Bearer ${apiKey}` });
     if (result.status !== 200) {
-      console.error('Groq error', result.status, JSON.stringify(result.body).slice(0, 200));
-      return { _error: `groq_status_${result.status}` };
+      console.error(`${providerName} error`, result.status, JSON.stringify(result.body).slice(0, 200));
+      return { _error: `${providerName.toLowerCase()}_status_${result.status}` };
     }
-    const text = result.body?.choices?.[0]?.message?.content || '';
-    const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+    const text = result.body?.choices?.[0]?.message?.content || ‘’;
+    const cleaned = text.replace(/```(?:json)?/gi, ‘’).replace(/```/g, ‘’).trim();
     const parsed = JSON.parse(cleaned);
     if (!parsed.primary_category || !parsed.example_ai_shopping_questions) {
-      return { _error: 'groq_missing_fields' };
+      return { _error: `${providerName.toLowerCase()}_missing_fields` };
     }
-    console.log('Groq fallback succeeded');
+    console.log(`${providerName} succeeded`);
     return parsed;
   } catch (err) {
-    console.error('Groq call failed:', err.message);
-    return { _error: err.message || 'groq_unknown' };
+    console.error(`${providerName} failed:`, err.message);
+    return { _error: err.message || `${providerName.toLowerCase()}_unknown` };
   }
 }
 
-// â”€â”€ AI orchestrator: Gemini â†’ Groq fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Groq — blocks Vercel IPs; kept as option if hosting changes
+function callGroq(prompt) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return Promise.resolve(null);
+  return callOpenAICompat(‘https://api.groq.com/openai/v1/chat/completions’, ‘llama-3.1-8b-instant’, apiKey, prompt, ‘Groq’);
+}
+
+// OpenRouter — works from Vercel, free tier, no credit card required
+// Free models: meta-llama/llama-3.1-8b-instruct:free, mistralai/mistral-7b-instruct:free
+function callOpenRouter(prompt) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return Promise.resolve(null);
+  return callOpenAICompat(
+    ‘https://openrouter.ai/api/v1/chat/completions’,
+    ‘meta-llama/llama-3.1-8b-instruct:free’,
+    apiKey,
+    prompt,
+    ‘OpenRouter’,
+  );
+}
+
+// â”€â”€ AI orchestrator: Gemini â†’ Groq â†’ OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function callAI(extracted, targetUrl, analysisStatus) {
   const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus);
 
-  // Try Gemini first
   const geminiResult = await callGemini(prompt);
   if (geminiResult && !geminiResult._error) return geminiResult;
 
-  // Fall back to Groq if Gemini key missing or rate-limited
   const groqResult = await callGroq(prompt);
   if (groqResult && !groqResult._error) return groqResult;
+
+  const openRouterResult = await callOpenRouter(prompt);
+  if (openRouterResult && !openRouterResult._error) return openRouterResult;
 
   // Both failed â€” return the Gemini error (or Groq error if no Gemini key)
   return geminiResult || groqResult || { _error: 'no_ai_provider' };
