@@ -9,10 +9,69 @@ const { URL } = require('url');
 // No paid API call is made in this version — classification is keyword-based only.
 // ──────────────────────────────────────────────────────────────────────────────
 
-// ── Known-domain overrides (for validation testing) ───────────────────────────
-// These bypass keyword detection for well-known brands where scraping may fail
-// or where category is unambiguous.
+// ── Blocked/error page detection ─────────────────────────────────────────────
+// Phrases that indicate the response is a bot-block or error page, not real content.
+const BLOCKED_SIGNALS = [
+  'access denied', 'forbidden', '403 forbidden', 'request blocked',
+  'bot protection', 'just a moment', 'checking your browser',
+  'enable javascript and cookies', 'ddos protection', 'akamai',
+  'ray id', 'cf-ray', 'attention required', 'security check',
+  'please enable cookies', 'are you human',
+];
+
+// Titles that are definitively error pages regardless of body
+const BLOCKED_TITLES = [
+  'access denied', 'forbidden', '403', 'error', 'blocked', 'just a moment',
+  'attention required', 'bot check', 'security check',
+];
+
+function isBlockedPage(extracted) {
+  const { title, bodyText } = extracted;
+  const titleLower = (title || '').toLowerCase();
+  const bodyLower = (bodyText || '').toLowerCase().slice(0, 2000);
+
+  // Title is a known error title
+  if (BLOCKED_TITLES.some(t => titleLower === t || titleLower.startsWith(t + ' '))) return true;
+
+  // Body has a blocked signal and the content is thin (< 500 meaningful chars)
+  const bodyMeaningful = bodyText.replace(/\s+/g, ' ').trim().length;
+  if (bodyMeaningful < 500 && BLOCKED_SIGNALS.some(s => bodyLower.includes(s))) return true;
+
+  // Body text is nearly empty even though we fetched something
+  if (bodyMeaningful < 100) return true;
+
+  return false;
+}
+
+// ── Known-domain overrides ────────────────────────────────────────────────────
+// Domain overrides fire regardless of whether scraping succeeds or fails.
+// Add domains here to guarantee correct classification for major known retailers.
 const DOMAIN_OVERRIDES = {
+  'sainsburys.co.uk': {
+    primary: 'grocery',
+    categories: ['grocery', 'food', 'general-retail'],
+    summary: 'Sainsbury\'s is one of the UK\'s largest supermarket chains offering grocery delivery, click & collect, fresh food, and own-brand products online and in-store.',
+  },
+  'tesco.com': {
+    primary: 'grocery',
+    categories: ['grocery', 'food', 'general-retail'],
+    summary: 'Tesco is the UK\'s largest supermarket, offering online grocery delivery, click & collect, Clubcard loyalty, and a wide range of fresh and own-brand products.',
+  },
+  'waitrose.com': {
+    primary: 'grocery',
+    categories: ['grocery', 'food'],
+    summary: 'Waitrose is a premium UK supermarket known for fresh, high-quality food, own-brand products, and online grocery delivery.',
+  },
+  'ocado.com': {
+    primary: 'grocery',
+    categories: ['grocery', 'food'],
+    summary: 'Ocado is a UK online-only supermarket offering grocery delivery from a wide range of brands including Waitrose, M&S, and own-label products.',
+  },
+  'marksandspencer.com': {
+    primary: 'fashion',
+    categories: ['fashion', 'food', 'homeware', 'general-retail'],
+    summary: 'Marks & Spencer is a leading UK retailer selling clothing, lingerie, homeware, and premium food products online and in-store.',
+  },
   'next.co.uk': {
     primary: 'fashion',
     categories: ['fashion', 'homeware', 'baby-kids', 'general-retail'],
@@ -42,6 +101,16 @@ const DOMAIN_OVERRIDES = {
 
 // ── Category definitions with weighted keywords ────────────────────────────────
 const CATEGORY_DEFS = {
+  grocery: {
+    label: 'Grocery & supermarket',
+    keywords: [
+      'grocery', 'supermarket', 'groceries', 'fresh food', 'food delivery', 'online shopping',
+      'click and collect', 'click & collect', 'own brand', 'meal deal', 'fresh produce',
+      'fruit and veg', 'bakery', 'dairy', 'meat', 'fish', 'deli', 'chilled', 'frozen',
+      'household essentials', 'clubcard', 'nectar', 'loyalty card', 'delivery pass',
+      'weekly shop', 'food bank', 'recipe ideas',
+    ],
+  },
   fashion: {
     label: 'Fashion & apparel',
     keywords: [
@@ -167,6 +236,13 @@ const CATEGORY_DEFS = {
 
 // ── Question templates per category ───────────────────────────────────────────
 const QUESTIONS = {
+  grocery: [
+    'best online grocery delivery in the UK',
+    'best supermarket for fresh food UK',
+    'best supermarket own-brand products UK',
+    'best grocery delivery for families UK',
+    'best value supermarket in the UK',
+  ],
   fashion: [
     'best affordable women\'s jeans UK 2025',
     'best men\'s winter coat under £100',
@@ -249,7 +325,8 @@ const QUESTIONS = {
 
 // ── Customer type labels ───────────────────────────────────────────────────────
 const CUSTOMER_TYPES = {
-  fashion:                 'shoppers researching clothing, footwear and accessories',
+  grocery:                 'shoppers researching grocery delivery, supermarket options and food value',
+  fashion:                'shoppers researching clothing, footwear and accessories',
   beauty:                  'beauty shoppers researching ingredients and product results',
   homeware:                'home shoppers looking for furniture, bedding and décor',
   food:                    'food lovers exploring artisan and specialty products',
@@ -469,22 +546,38 @@ module.exports = async (req, res) => {
   let extracted = { title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' };
   let fetchedOk = false;
 
+  let analysisStatus = 'ok'; // ok | blocked | failed
+
   if (!override) {
     try {
       const html = await fetchHtml(targetUrl);
       extracted = extract(html);
-      fetchedOk = !!(extracted.title || extracted.metaDesc || extracted.headings.length > 0);
-    } catch { /* fetchedOk stays false */ }
+      if (isBlockedPage(extracted)) {
+        analysisStatus = 'blocked';
+      } else {
+        fetchedOk = !!(extracted.title || extracted.metaDesc || extracted.headings.length > 0);
+        if (!fetchedOk) analysisStatus = 'failed';
+      }
+    } catch {
+      analysisStatus = 'failed';
+    }
   } else {
     fetchedOk = true;
     if (override.summary) extracted.metaDesc = override.summary;
   }
 
-  // If we got nothing useful, ask user to select category manually
-  if (!fetchedOk && !override) {
+  // Domain override always wins — even if scraping was blocked
+  if (override) {
+    analysisStatus = 'ok';
+    fetchedOk = true;
+  }
+
+  // No override and blocked/failed → ask user to pick category manually
+  if (!override && (analysisStatus === 'blocked' || analysisStatus === 'failed')) {
     return res.status(200).json({
       fetchedOk: false,
       needsManualCategory: true,
+      analysis_status: analysisStatus,
       title: '',
       summary: '',
       categories: [],
@@ -514,6 +607,7 @@ module.exports = async (req, res) => {
   res.status(200).json({
     fetchedOk,
     needsManualCategory: false,
+    analysis_status: analysisStatus,
     manual: false,
     title: extracted.title || extracted.ogTitle,
     ogTitle: extracted.ogTitle,

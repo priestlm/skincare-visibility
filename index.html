@@ -277,12 +277,13 @@
       <!-- Step 3: Manual category fallback -->
       <div id="step-fallback" class="step">
         <div class="fallback-wrap">
-          <div class="fallback-notice">
-            <b>We could not fully read this website automatically.</b><br>
-            This can happen when a site uses bot protection, JavaScript rendering, or blocks external requests. You can still create an initial preview by selecting your category below.
+          <div class="fallback-notice" id="fallback-notice">
+            <b>We couldn't fully read this website automatically.</b><br>
+            <span id="fallback-detail">This can happen when a site uses bot protection, JavaScript rendering, or blocks external requests.</span> You can still prepare an initial visibility preview by selecting your category below.
           </div>
           <select id="fallback-category" class="fallback-select">
             <option value="">— Select your category —</option>
+            <option value="grocery">Grocery &amp; supermarket</option>
             <option value="fashion">Fashion &amp; apparel</option>
             <option value="beauty">Beauty &amp; skincare</option>
             <option value="homeware">Homeware &amp; décor</option>
@@ -306,14 +307,15 @@
       <div id="step-email" class="step">
         <p style="font-family:'Newsreader',serif;font-size:1.12rem;margin-bottom:14px;line-height:1.35">Your initial preview is ready. Enter your email to receive the <em>full visibility report.</em></p>
         <form class="email-form" id="hero-form" action="https://formspree.io/f/mojzkvgo" method="POST" data-form>
-          <input type="hidden" name="website_url"  id="h-url">
-          <input type="hidden" name="brand_name"   id="h-brand">
-          <input type="hidden" name="market"       id="h-market">
-          <input type="hidden" name="primary_category" id="h-category">
-          <input type="hidden" name="all_categories"   id="h-categories">
-          <input type="hidden" name="summary"      id="h-summary">
-          <input type="hidden" name="questions"    id="h-questions">
-          <input type="hidden" name="timestamp"    id="h-timestamp">
+          <input type="hidden" name="website_url"        id="h-url">
+          <input type="hidden" name="brand_name"        id="h-brand">
+          <input type="hidden" name="market"            id="h-market">
+          <input type="hidden" name="analysis_status"   id="h-status">
+          <input type="hidden" name="inferred_category" id="h-category">
+          <input type="hidden" name="secondary_categories" id="h-categories">
+          <input type="hidden" name="summary"           id="h-summary">
+          <input type="hidden" name="generated_questions" id="h-questions">
+          <input type="hidden" name="timestamp"         id="h-timestamp">
           <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
           <button type="submit">Get report</button>
         </form>
@@ -482,14 +484,16 @@
     }
 
     // Populate hidden Formspree fields
-    document.getElementById('h-url').value       = inputUrl;
-    document.getElementById('h-brand').value     = brandName;
-    document.getElementById('h-market').value    = market;
-    document.getElementById('h-category').value  = data.primary || '';
-    document.getElementById('h-categories').value = (data.categories || []).map(function (c) { return c.label; }).join(', ');
-    document.getElementById('h-summary').value   = summary.slice(0, 300);
-    document.getElementById('h-questions').value = (data.questions || []).join(' | ');
-    document.getElementById('h-timestamp').value = new Date().toISOString();
+    document.getElementById('h-url').value        = inputUrl;
+    document.getElementById('h-brand').value      = brandName;
+    document.getElementById('h-market').value     = market;
+    document.getElementById('h-status').value     = data.analysis_status || 'ok';
+    document.getElementById('h-category').value   = data.primary || '';
+    var secondaryCats = (data.categories || []).filter(function(c){ return !c.primary; }).map(function(c){ return c.label; });
+    document.getElementById('h-categories').value = secondaryCats.join(', ');
+    document.getElementById('h-summary').value    = summary.slice(0, 300);
+    document.getElementById('h-questions').value  = (data.questions || []).join(' | ');
+    document.getElementById('h-timestamp').value  = new Date().toISOString();
 
     // Swap panels
     document.getElementById('panel-mock').style.display   = 'none';
@@ -554,6 +558,14 @@
 
       setTimeout(function () {
         if (data.needsManualCategory) {
+          // Tailor fallback message based on why it failed
+          if (data.analysis_status === 'blocked') {
+            document.getElementById('fallback-detail').textContent =
+              'Some larger retailers block automated previews. We can still prepare an initial visibility preview from the domain and category signals.';
+          } else {
+            document.getElementById('fallback-detail').textContent =
+              'This can happen when a site uses bot protection, JavaScript rendering, or blocks external requests.';
+          }
           showStep('step-fallback');
         } else {
           renderResult(data, rawUrl, brandName, market);
