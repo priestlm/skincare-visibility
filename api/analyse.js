@@ -518,59 +518,51 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
       ogDesc      ? `OG description: ${ogDesc}` : '',
       headings.length ? `Headings: ${headings.slice(0, 8).join(' | ')}` : '',
       navLinks.length ? `Navigation links: ${navLinks.slice(0, 20).join(', ')}` : '',
-      bodyText    ? `Body text snippet: ${bodyText.slice(0, 1200)}` : '',
+      bodyText    ? `Body text snippet: ${bodyText.slice(0, 800)}` : '',
     ].filter(Boolean).join('\n');
 
-  const prompt = `Analyse the website signals below. Return ONLY a valid JSON object — no markdown, no fences. Be concise: keep all string values brief (under 20 words each). Arrays should have no more than 6 items each.
+  const prompt = `Analyse the website signals below. Return ONLY a valid JSON object — no markdown, no fences. Keep all string values under 20 words. Arrays max 5 items.
 
 {
-  "organisation_name": "trading name only — not a page title or blog heading",
+  "organisation_name": "trading name only",
   "brand_name": "short searchable name",
-  "business_summary": "2-3 sentences in your own words — do not copy page text",
+  "business_summary": "2-3 sentences in your own words",
   "primary_category": "one exact value from the category list",
   "secondary_categories": [],
-  "detected_niche": "specific sub-type e.g. Cornish cask ale brewery, Speciality coffee roaster — empty if none",
-  "products_or_services_found": [{"category": "specific label", "examples": ["named product 1", "named product 2"]}],
-  "customer_channels": [{"channel": "e.g. On-trade pub supply / Direct ecommerce / Foodservice", "reason": "one sentence citing specific evidence found"}],
-  "public_signals": ["award", "heritage claim", "location", "sustainability note", "years trading"],
-  "target_customer_type": "short phrase",
-  "market_or_location_signals": "e.g. Cornwall UK, South West, nationwide — empty if none",
-  "allowed_topics": ["ONLY list topics drawn from products_or_services_found, customer_channels and public_signals above — questions must use ONLY these"],
-  "likely_search_intents": ["5 specific reasons someone would search for this type of business — e.g. 'buying a gift', 'planning a pub visit', 'sourcing stock for a bar', 'finding local delivery', 'booking a brewery tour'"],
+  "detected_niche": "specific sub-type e.g. Cornish cask ale brewery — empty if none",
+  "products_or_services_found": [{"category": "label", "examples": ["product 1", "product 2"]}],
+  "customer_channels": [{"channel": "e.g. Direct ecommerce / Pub supply", "reason": "one sentence"}],
+  "public_signals": ["award", "heritage", "location", "years trading"],
+  "market_or_location_signals": "e.g. Cornwall UK — empty if none",
+  "allowed_topics": ["topics from products/channels/signals only — questions must use ONLY these"],
+  "likely_search_intents": ["5 real customer needs: who is searching and why, e.g. 'dad buying a beer gift', 'bar manager finding local stock', 'couple planning a day out'"],
   "example_ai_shopping_questions": [
-    {"question": "CONVERSATIONAL SENTENCE as someone would type to ChatGPT or Perplexity. Start with 'find me', 'recommend', 'I'm looking for', 'where can I find', 'what's the best', or 'I need'. Include at least one specific constraint: location, occasion, who it's for, trade vs consumer, budget, or style preference. See QUESTION FORMAT rules below.", "search_intent": "the specific customer need, occasion or context: who is searching and why", "why_relevant": "one sentence naming product/channel/signal from allowed_topics", "evidence_term": "single key term from allowed_topics"}
+    {"question": "natural sentence as typed to ChatGPT — casual plain English, real-life detail, starts with find me/I'm looking for/can you recommend/where can I get/what's a good/I need", "search_intent": "who is searching and why", "evidence_term": "single key term from allowed_topics"}
   ],
   "visibility_gaps": ["missing info a buyer would want"],
   "confidence_score": 0.85
 }
 
 RULES:
-1. Extract products/services first. Classify from evidence — not assumptions. Brewery → "Food & drink". Dairy → "Food & drink". Skincare → "Beauty & skincare".
-2. allowed_topics: list ONLY topics found in the signals above. Do not add anything that was not on the website.
-3. SEARCH INTENT — identify 5 specific customer types or occasions that would make someone search for this business. Think about real people with a real need: "a pub landlord in Devon who needs to restock", "a couple looking for something to do in Cornwall for the weekend", "someone buying a beer gift for their dad", "a bar manager looking for local suppliers", "someone who just moved to the area and wants to find local producers".
-4. QUESTION FORMAT — THIS IS CRITICAL. Read carefully.
-   Imagine a real person sitting at their laptop typing a question into ChatGPT or asking Alexa. They are NOT writing marketing copy. They talk casually, in plain English, as if asking a friend.
-   Write as a FULL NATURAL SENTENCE — the kind of thing someone would actually say out loud.
-   Start with: "find me", "I'm looking for", "where can I get", "can you recommend", "what's a good", "do you know", "I need", "can you suggest".
-   Include a real-life detail that explains WHY they're searching: who it's for, what occasion, where they are, what they're trying to do.
-   Use plain everyday words. A real person does not say "award-winning", "premium", "artisan", "renowned", "finest", "wholesaler", "on-trade", "hospitality supplier", "craft beverage", or "local producer" when typing to ChatGPT. They say things like "a good local brewery", "somewhere near me", "for my bar", "to take home", "as a gift for my dad".
-   FORBIDDEN WORDS (do not use): award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, hospitality supplier, craft beverage, curated, bespoke. Also forbidden: the business name, brand name, "you", "your", "tell me about".
-   GOOD EXAMPLES (casual, specific, natural): "I'm looking for a local brewery in Cornwall that sells to pubs — any recommendations?" / "where can I get Cornish beer delivered to my door?" / "can you suggest a nice brewery to visit near Truro for a day out?" / "I need to find somewhere in Cornwall that does bulk beer for my bar" / "what's a good place near St Austell to take my dad who loves trying local ales?"
-   BAD EXAMPLES (marketing language, not natural speech): "recommend an independent brewery in Cornwall that supplies pubs wholesale" / "find me award-winning cask ales brewed in Cornwall that I can order for my bar" / "where can I find a drinks wholesaler in Devon to supply my bar with local beer?"
-5. Each question must use a term from allowed_topics. evidence_term must appear in allowed_topics. Omit rather than invent.
-6. Do NOT write questions about: coffee, gin, pasta, chocolate, skincare, clothing, fitness, electronics — unless those appear in products_or_services_found.
-6. confidence_score: 0.6-0.75 if website blocked access.
+1. Classify from evidence. Brewery → "Food & drink". Skincare → "Beauty & skincare".
+2. allowed_topics: ONLY topics found in the signals. Nothing invented.
+3. Questions must sound like a real person talking to ChatGPT — casual, plain English, not marketing copy. FORBIDDEN WORDS: award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, bespoke, curated, hospitality supplier. Also forbidden: business name, brand name, "you", "your".
+   GOOD: "I'm looking for a local brewery in Cornwall that sells to pubs — any recommendations?" / "where can I get Cornish beer delivered?" / "what's a good brewery near Truro to visit for a day out?"
+   BAD: "find me award-winning cask ales" / "recommend an independent brewery that supplies pubs wholesale"
+4. Each question must use a term from allowed_topics. evidence_term must be in allowed_topics. Omit rather than invent.
+5. Do NOT write questions about categories not in products_or_services_found.
+6. confidence_score: 0.6-0.75 if website blocked.
 
 Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
 
 Website signals:
 ${signalsBlock}`;
 
-  // Model fallback chain — if the primary model is rate-limited, try the next one.
-  const MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-lite'];
+  // Model fallback: flash-lite has 30 RPM vs flash's 15 RPM — better rate limit headroom
+  const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash'];
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 3000 },
   };
 
   let result, usedModel;
@@ -774,15 +766,15 @@ function applyGeminiResult(gemini, brandNameInput) {
     ? gemini.market_or_location_signals.trim()
     : '';
 
-  // example_ai_shopping_questions can be [{question, why_relevant}] (new) or [string] (legacy)
+  // example_ai_shopping_questions can be [{question, search_intent, evidence_term}] or [string] (legacy)
   const rawAiQs = Array.isArray(gemini.example_ai_shopping_questions)
     ? gemini.example_ai_shopping_questions
     : [];
 
-  // Normalise to [{question, why_relevant, search_intent, evidence_term}]
+  // Normalise to [{question, search_intent, evidence_term}]
   const normalisedQs = rawAiQs.map(q => {
-    if (typeof q === 'string') return { question: q, why_relevant: '', search_intent: '', evidence_term: '' };
-    if (q && typeof q.question === 'string') return { question: q.question, why_relevant: q.why_relevant || '', search_intent: q.search_intent || '', evidence_term: q.evidence_term || '' };
+    if (typeof q === 'string') return { question: q, search_intent: '', evidence_term: '' };
+    if (q && typeof q.question === 'string') return { question: q.question, search_intent: q.search_intent || q.why_relevant || '', evidence_term: q.evidence_term || '' };
     return null;
   }).filter(Boolean).filter(q => q.question.length > 5).slice(0, 5);
 
@@ -1068,7 +1060,7 @@ module.exports = async (req, res) => {
         // that are unrelated to this business. Show weak-evidence warning instead.
         questions = []; questionsRich = []; weakEvidence = true;
       } else {
-        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, why_relevant: '' }));
+        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
       }
     }
   } else {
@@ -1097,7 +1089,7 @@ module.exports = async (req, res) => {
         // that are unrelated to this business. Show weak-evidence warning instead.
         questions = []; questionsRich = []; weakEvidence = true;
       } else {
-        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, why_relevant: '' }));
+        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
       }
     }
   }
