@@ -166,6 +166,9 @@
   .cat-tag.niche{background:rgba(15,118,110,.08);color:#0f766e;border:1px solid rgba(15,118,110,.18)}
   .result-org{font-size:13px;font-weight:600;color:var(--plum);letter-spacing:.01em;margin:0 0 6px;text-transform:uppercase}
   .result-products{font-size:12px;color:var(--ink-soft);background:var(--porcelain);border:1px solid var(--line);border-radius:8px;padding:7px 11px;margin:0 0 14px;line-height:1.5}
+  .result-q-why{font-size:11px;color:var(--ink-soft);margin:3px 0 0 20px;font-style:italic;line-height:1.4}
+  .result-gaps{margin:4px 0 12px;padding-left:16px}
+  .result-gaps li{font-size:12px;color:var(--ink-soft);margin-bottom:3px;line-height:1.45}
   .result-summary{color:var(--ink-soft);font-size:15px;margin:8px 0 14px;line-height:1.55}
   .result-questions{display:flex;flex-direction:column;gap:6px}
   .result-q{
@@ -321,6 +324,7 @@
           <input type="hidden" name="secondary_categories" id="h-categories">
           <input type="hidden" name="summary"            id="h-summary">
           <input type="hidden" name="generated_questions" id="h-questions">
+          <input type="hidden" name="visibility_gaps"    id="h-gaps">
           <input type="hidden" name="timestamp"          id="h-timestamp">
           <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
           <button type="submit">Get report</button>
@@ -362,6 +366,10 @@
           <p class="result-products" id="result-products" style="display:none"></p>
           <p class="ans-label" id="result-q-label">Example AI-shopping questions</p>
           <div class="result-questions" id="result-questions"></div>
+          <div id="result-gaps-wrap" style="display:none">
+            <p class="ans-label" style="margin-top:14px">Visibility gaps</p>
+            <ul class="result-gaps" id="result-gaps"></ul>
+          </div>
           <div class="result-narrative" id="result-narrative"></div>
           <p class="result-fetch-warn" id="result-fetch-warn" style="display:none">⚠ Could not read this website directly — preview based on selected category.</p>
         </div>
@@ -505,15 +513,46 @@
       ? 'Example AI-shopping questions — ' + data.niche
       : 'Example AI-shopping questions in your category';
 
-    // Questions
+    // Questions — use questionsRich (with why_relevant) if available, else plain
     var qEl = document.getElementById('result-questions');
     qEl.innerHTML = '';
-    (data.questions || []).forEach(function (q) {
+    var richQs = Array.isArray(data.questionsRich) && data.questionsRich.length > 0
+      ? data.questionsRich
+      : (data.questions || []).map(function(q){ return { question: q, why_relevant: '' }; });
+    richQs.forEach(function (qObj) {
+      var qText = typeof qObj === 'string' ? qObj : (qObj.question || '');
+      var why   = typeof qObj === 'object' ? (qObj.why_relevant || '') : '';
+      if (!qText) return;
+      var wrap = document.createElement('div');
+      wrap.style.marginBottom = '6px';
       var d = document.createElement('div');
       d.className = 'result-q';
-      d.textContent = q;
-      qEl.appendChild(d);
+      d.textContent = qText;
+      wrap.appendChild(d);
+      if (why) {
+        var w = document.createElement('p');
+        w.className = 'result-q-why';
+        w.textContent = why;
+        wrap.appendChild(w);
+      }
+      qEl.appendChild(wrap);
     });
+
+    // Visibility gaps
+    var gaps = Array.isArray(data.visibilityGaps) ? data.visibilityGaps.filter(Boolean) : [];
+    var gapsWrap = document.getElementById('result-gaps-wrap');
+    var gapsList = document.getElementById('result-gaps');
+    if (gaps.length > 0) {
+      gapsList.innerHTML = '';
+      gaps.slice(0, 4).forEach(function(g) {
+        var li = document.createElement('li');
+        li.textContent = g;
+        gapsList.appendChild(li);
+      });
+      gapsWrap.style.display = 'block';
+    } else {
+      gapsWrap.style.display = 'none';
+    }
 
     // Narrative
     document.getElementById('result-narrative').textContent = data.riskNarrative || '';
@@ -535,7 +574,8 @@
     var secondaryCats = (data.categories || []).filter(function(c){ return !c.primary; }).map(function(c){ return c.label; });
     document.getElementById('h-categories').value = secondaryCats.join(', ');
     document.getElementById('h-summary').value   = summary.slice(0, 300);
-    document.getElementById('h-questions').value = (data.questions || []).join(' | ');
+    document.getElementById('h-questions').value = richQs.map(function(q){ return typeof q === 'string' ? q : q.question; }).join(' | ');
+    document.getElementById('h-gaps').value      = gaps.join(' | ');
     document.getElementById('h-timestamp').value = new Date().toISOString();
 
     // Swap panels

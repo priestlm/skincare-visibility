@@ -521,66 +521,98 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
       bodyText    ? `Body text snippet: ${bodyText.slice(0, 1200)}` : '',
     ].filter(Boolean).join('\n');
 
-  const prompt = `You are an AI shopping visibility analyst. Your job is to identify what a business sells and generate specific AI-shopping questions a shopper might ask when looking for those products.
+  const prompt = `You are an AI shopping and search visibility analyst. Analyse the public website signals below and produce a structured business profile.
 
-Analyse the public website signals below. Return ONLY a valid JSON object — no markdown, no code fences, no explanation.
+Return ONLY a valid JSON object — no markdown, no code fences, no explanation. Use exactly these fields:
 
-Required JSON fields:
 {
-  "organisation_name": "legal or trading name of the organisation",
-  "brand_name": "short brand name shoppers would search for",
-  "business_summary": "1–2 sentence AI-generated description of what this business specifically sells — do NOT copy page text",
-  "primary_category": "one category from the list below",
+  "organisation_name": "legal or trading name — NOT a blog post title or page heading",
+  "brand_name": "short name shoppers would search for",
+  "business_summary": "2–3 sentence plain-English summary written in your own words — do NOT copy page text verbatim",
+  "primary_category": "one exact category from the list below",
   "secondary_categories": [],
-  "detected_niche": "specific sub-type, e.g. Cornish clotted cream, Speciality coffee, Clinical skincare — empty string if none",
-  "products_or_services_found": ["list", "of", "specific", "products", "or", "services", "detected"],
-  "target_customer_type": "short phrase describing the typical shopper or buyer",
-  "market_or_location_signals": "any detected geography or market signals, e.g. UK, Cornwall, London — empty string if none",
+  "detected_niche": "specific sub-type within primary category, e.g. Cornish clotted cream, Speciality coffee roaster, Clinical skincare — empty string if none",
+  "products_or_services_found": [
+    { "category": "category label", "examples": ["specific product 1", "specific product 2"] }
+  ],
+  "customer_channels": [
+    { "channel": "e.g. Direct ecommerce / Foodservice trade / Local retail / Hospitality", "reason": "one sentence why, based on website evidence" }
+  ],
+  "public_signals": ["award or certification", "heritage or provenance claim", "sustainability note", "production capability", "location or region", "delivery area"],
+  "target_customer_type": "short phrase",
+  "market_or_location_signals": "e.g. Cornwall UK, London, nationwide UK — empty string if none",
+  "example_ai_shopping_questions": [
+    { "question": "specific question a real buyer would ask an AI assistant", "why_relevant": "one sentence linking this question directly to a product, service or signal found on the website" }
+  ],
+  "visibility_gaps": ["information that is missing or unclear from the public signals"],
   "confidence_score": 0.85,
-  "evidence_used": "brief note on what signals were used to classify",
-  "example_ai_shopping_questions": ["5 specific questions a shopper would ask an AI assistant when looking for these products"]
+  "evidence_used": "brief note on which signals drove classification"
 }
 
-STEP 1 — EXTRACT PRODUCTS/SERVICES FIRST.
-Before choosing a category or writing questions, identify the specific products or services this business sells. List them in products_or_services_found.
-Examples: ["clotted cream", "dairy desserts", "Cornish fudge"], or ["single-origin coffee beans", "coffee subscriptions"], or ["clinical serums", "retinol", "niacinamide"].
+SEVEN-STEP PROCESS — follow this order exactly:
 
-STEP 2 — CLASSIFY BASED ON PRODUCTS.
-primary_category must reflect what the business primarily sells. Never default to a generic category.
-- A Cornish dairy selling clotted cream and desserts → "Food & drink"
-- A coffee roaster → "Food & drink"
-- A skincare brand → "Beauty & skincare"
-- A pet shop → "Pet products"
+STEP 1 — READ AND SUMMARISE.
+Write business_summary in your own words. Do not copy meta descriptions or headings. Identify the organisation_name from the trading name, not blog titles or page text.
 
-STEP 3 — WRITE PRODUCT-SPECIFIC QUESTIONS.
-Every question in example_ai_shopping_questions must relate to at least one entry in products_or_services_found or detected_niche.
-Never write questions about products NOT in products_or_services_found.
+STEP 2 — EXTRACT PRODUCTS AND SERVICES.
+List every product category and specific examples found in the signals. Be specific.
+Examples: [{category:"Dairy products", examples:["clotted cream","dairy desserts","Cornish cream"]}]
+Not: [{category:"Food", examples:["food products"]}]
+
+STEP 3 — CLASSIFY.
+primary_category must follow from what products_or_services_found shows.
+- Dairy producer → "Food & drink"
+- Coffee roaster → "Food & drink"
+- Brewery → "Food & drink"
+- Skincare brand → "Beauty & skincare"
+- Pet retailer → "Pet products"
+Never default to "General retail" for a specialist producer.
+
+STEP 4 — IDENTIFY CUSTOMER CHANNELS.
+Based on signals (nav links, headings, body text), identify how this business sells:
+ecommerce, wholesale/trade, foodservice, hospitality, local retail, visitors/tourism, national delivery.
+For each channel give a one-sentence reason based on website evidence.
+
+STEP 5 — NOTE PUBLIC SIGNALS.
+List awards, certifications, provenance claims (e.g. "Cornish made", "family farm"), sustainability claims, production capability, stockists, delivery areas, reviews or heritage.
+
+STEP 6 — GENERATE EVIDENCE-BASED QUESTIONS.
+Write 5 questions a real customer, trade buyer or visitor would ask an AI assistant.
+Rules:
+- Every question must relate directly to a product, service or signal in this profile.
+- Every question must have a why_relevant sentence linking it to specific website evidence.
+- Do NOT write about products not found on this website.
+- Do NOT write about coffee, chocolate, gin, bakery, skincare, clothing, tourism unless those are in products_or_services_found.
+- Prefer practical buyer-style questions: sourcing, quality, availability, trade supply, local, sustainable, delivery.
+
+STEP 7 — VALIDATE QUESTIONS.
+Before finalising, check every question. If any product, service, sector or location in the question is NOT directly supported by products_or_services_found or public_signals, delete it and replace it with a supported question.
 
 STRICT RULES:
-1. secondary_categories: only include when the website clearly sells those products too. Never add "Fashion & apparel" or "General retail" to a food producer.
-2. detected_niche: be specific — "Cornish clotted cream", "Speciality coffee", "Clinical skincare", "Raw dog food", "Sustainable activewear".
-3. products_or_services_found: list actual product names/types found in the signals. If signals are weak, make reasonable inferences from the URL/domain only.
-4. business_summary: write a concise AI-generated summary — do NOT copy meta description text verbatim.
-5. organisation_name: identify the legal or trading name, not a blog post title or page heading.
+- secondary_categories: only include if the website clearly sells those products. Never add "Fashion & apparel" or "General retail" to a specialist producer.
+- detected_niche: be specific. "Cornish clotted cream" not just "dairy". "Speciality coffee roaster" not just "coffee".
+- organisation_name: trading name only, not a page title or heading.
+- visibility_gaps: note anything that would help a buyer but is not publicly visible.
 
 CORRECT EXAMPLES:
-- Yallah Coffee Roasters: products=["single-origin coffee","coffee subscriptions","espresso beans"], niche="Speciality coffee", questions about coffee roasters/beans/subscriptions only
-- Ehrmann Cornish Dairy: products=["clotted cream","dairy desserts","Cornish cream"], niche="Cornish dairy / Clotted cream", questions about clotted cream/dairy/Cornish food only
-- The Ordinary: products=["niacinamide serum","retinol","vitamin C","AHA exfoliant"], niche="Clinical skincare", questions about serums/actives only
-- Next: products=["women's clothing","men's fashion","homeware","kidswear"], primary="Fashion & apparel", secondary=["Homeware & décor","Baby & kids"], questions about fashion and home
+- Cornish dairy: products=[{category:"Dairy",examples:["clotted cream","dairy desserts"]}], niche="Cornish clotted cream", questions only about clotted cream, cream teas, dairy sourcing, Cornish food
+- Coffee roaster: products=[{category:"Coffee",examples:["single-origin beans","subscriptions"]}], niche="Speciality coffee roaster", questions only about coffee
+- Brewery: products=[{category:"Beer",examples:["pale ale","IPA","lager"]}], channels=[{channel:"On-trade pubs",reason:"nav shows trade enquiry page"}], questions about beer, pub supply, local availability
+- Next.co.uk: products=[{category:"Clothing",examples:["women's fashion","men's clothing"]},{category:"Homeware",examples:["furniture","bedding"]}], questions about fashion and homeware
 
-INCORRECT EXAMPLES (never do this):
-- Dairy producer → questions about gin or pasta sauce ✗
+INCORRECT (never do this):
+- Dairy → questions about gin or pasta sauce ✗
 - Coffee roaster → questions about women's jeans ✗
-- Skincare brand → secondary category "General retail" ✗
+- Any specialist → secondary category "General retail" without clear evidence ✗
 
-Supported primary_category values (exact strings only):
+Supported primary_category values (use exact strings):
 Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
 
 Additional rules:
 - Do not claim to have checked ChatGPT, Gemini, Perplexity or Google AI results.
+- Use phrases like "initial preview", "public website signals", "detected products", "example AI-shopping questions".
 - confidence_score: 0.0–1.0. Use 0.6–0.75 if website blocked access.
-- If access was blocked, infer products from URL/domain name and general brand knowledge.
+- If access was blocked, infer from URL/domain and general brand knowledge only.
 
 Website signals:
 ${signalsBlock}`;
@@ -589,7 +621,7 @@ ${signalsBlock}`;
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
     const result = await postJson(endpoint, {
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
+      generationConfig: { temperature: 0.2, maxOutputTokens: 2000 },
     });
 
     if (result.status !== 200) {
@@ -743,8 +775,32 @@ function applyGeminiResult(gemini, brandNameInput) {
     ? gemini.detected_niche.trim()
     : '';
 
-  const productsFound = Array.isArray(gemini.products_or_services_found)
-    ? gemini.products_or_services_found.filter(p => typeof p === 'string' && p.length > 1)
+  // products_or_services_found can be [{category, examples}] (new) or [string] (legacy)
+  const rawProds = Array.isArray(gemini.products_or_services_found) ? gemini.products_or_services_found : [];
+  let productsFound = [];       // flat string list for display
+  let productsStructured = [];  // [{category, examples}] for richer display
+  for (const p of rawProds) {
+    if (typeof p === 'string' && p.length > 1) {
+      productsFound.push(p);
+    } else if (p && typeof p === 'object' && Array.isArray(p.examples)) {
+      productsStructured.push({ category: p.category || '', examples: p.examples.filter(e => typeof e === 'string') });
+      productsFound.push(...p.examples.filter(e => typeof e === 'string'));
+    }
+  }
+
+  // customer_channels: [{channel, reason}]
+  const customerChannels = Array.isArray(gemini.customer_channels)
+    ? gemini.customer_channels.filter(c => c && typeof c.channel === 'string')
+    : [];
+
+  // public_signals: [string]
+  const publicSignals = Array.isArray(gemini.public_signals)
+    ? gemini.public_signals.filter(s => typeof s === 'string' && s.length > 1)
+    : [];
+
+  // visibility_gaps: [string]
+  const visibilityGaps = Array.isArray(gemini.visibility_gaps)
+    ? gemini.visibility_gaps.filter(s => typeof s === 'string' && s.length > 1)
     : [];
 
   const organisationName = typeof gemini.organisation_name === 'string'
@@ -755,55 +811,70 @@ function applyGeminiResult(gemini, brandNameInput) {
     ? gemini.market_or_location_signals.trim()
     : '';
 
-  // Niche template lookup — try each word/phrase of the niche against the template keys
+  // example_ai_shopping_questions can be [{question, why_relevant}] (new) or [string] (legacy)
+  const rawAiQs = Array.isArray(gemini.example_ai_shopping_questions)
+    ? gemini.example_ai_shopping_questions
+    : [];
+
+  // Normalise to [{question, why_relevant}]
+  const normalisedQs = rawAiQs.map(q => {
+    if (typeof q === 'string') return { question: q, why_relevant: '' };
+    if (q && typeof q.question === 'string') return { question: q.question, why_relevant: q.why_relevant || '' };
+    return null;
+  }).filter(Boolean).filter(q => q.question.length > 5).slice(0, 5);
+
+  // Niche template lookup
   const nicheLower = detectedNiche.toLowerCase();
   const nicheTemplate = Object.entries(NICHE_QUESTIONS)
     .find(([k]) => nicheLower.includes(k))?.[1] || null;
   const categoryTemplate = QUESTIONS[primaryKey] || QUESTIONS.other;
 
-  const rawAiQuestions = Array.isArray(gemini.example_ai_shopping_questions)
-    ? gemini.example_ai_shopping_questions.filter(q => typeof q === 'string' && q.length > 5).slice(0, 5)
-    : [];
-
-  // Build a set of product terms for question relevance checking
+  // Validate questions: must not contain exclusive terms from a different category
+  // AND if products known, must relate to at least one
   const productTerms = productsFound.map(p => p.toLowerCase());
-
-  // A question passes if:
-  // (a) it does NOT contain exclusive terms from a different category, AND
-  // (b) if product terms are known, it contains at least one product term or niche word
-  //     OR the question is generic enough (no exclusive terms from any category)
   function questionIsValid(q) {
-    const ql = q.toLowerCase();
+    const ql = q.question.toLowerCase();
     if (questionMismatch(ql, primaryKey)) return false;
-    // If we have specific product terms, require at least one to appear
     if (productTerms.length >= 2) {
       const nicheWords = nicheLower.split(/[\s\/,]+/).filter(w => w.length > 3);
-      const allTerms = [...productTerms, ...nicheWords];
-      return allTerms.some(t => ql.includes(t));
+      return [...productTerms, ...nicheWords].some(t => ql.includes(t));
     }
     return true;
   }
 
-  const validAiQuestions = rawAiQuestions.filter(questionIsValid);
+  const validQs = normalisedQs.filter(questionIsValid);
 
-  // Pad with niche then category fallbacks
+  // Pad with fallbacks (as plain strings, no why_relevant)
   const fallbackPool = nicheTemplate ? [...nicheTemplate, ...categoryTemplate] : [...categoryTemplate];
-  const seen = new Set(validAiQuestions.map(q => q.toLowerCase()));
-  const questions = [...validAiQuestions];
+  const seen = new Set(validQs.map(q => q.question.toLowerCase()));
+  const finalQs = [...validQs];
   for (const q of fallbackPool) {
-    if (questions.length >= 5) break;
-    if (!seen.has(q.toLowerCase())) { questions.push(q); seen.add(q.toLowerCase()); }
+    if (finalQs.length >= 5) break;
+    if (!seen.has(q.toLowerCase())) {
+      finalQs.push({ question: q, why_relevant: '' });
+      seen.add(q.toLowerCase());
+    }
   }
-  const finalQuestions = questions.length >= 2 ? questions : (nicheTemplate || categoryTemplate).slice(0, 5);
+  if (finalQs.length < 2) {
+    (nicheTemplate || categoryTemplate).slice(0, 5).forEach(q => {
+      if (finalQs.length < 5) finalQs.push({ question: q, why_relevant: '' });
+    });
+  }
+
+  // For backward-compat: also expose plain string array
+  const questionsPlain = finalQs.map(q => q.question);
 
   const brandName = gemini.brand_name || brandNameInput || '';
   const summary = gemini.business_summary || '';
   const customerType = gemini.target_customer_type || gemini.likely_customer_type || CUSTOMER_TYPES[primaryKey] || CUSTOMER_TYPES.other;
 
   return {
-    primaryKey, categories, questions: finalQuestions,
+    primaryKey, categories,
+    questions: questionsPlain,
+    questionsRich: finalQs,
     brandName, organisationName, summary, customerType,
-    detectedNiche, productsFound, locationSignals,
+    detectedNiche, productsFound, productsStructured,
+    customerChannels, publicSignals, visibilityGaps, locationSignals,
   };
 }
 
@@ -925,31 +996,21 @@ module.exports = async (req, res) => {
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName);
-      const { primaryKey, categories, questions, brandName: aiBrand, organisationName, summary, customerType, detectedNiche, productsFound, locationSignals } = mapped;
+      const { primaryKey, categories, questions, questionsRich, brandName: aiBrand, organisationName, summary, customerType, detectedNiche, productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
       const riskNarrative = buildRiskNarrative(aiBrand || brandName, primaryKey, categories);
       const categoryLabels = categories.map(c => ({
         key: c, label: CATEGORY_DEFS[c]?.label || c, primary: c === primaryKey,
       }));
       return res.status(200).json({
-        fetchedOk: false,
-        needsManualCategory: false,
-        analysis_status: analysisStatus,
-        aiAssisted: true,
-        geminiKeyPresent: true,
-        manual: false,
+        fetchedOk: false, needsManualCategory: false,
+        analysis_status: analysisStatus, aiAssisted: true, geminiKeyPresent: true, manual: false,
         title: organisationName || aiBrand || brandName || targetUrl,
         organisationName: organisationName || aiBrand || brandName || targetUrl,
-        summary,
-        primary: primaryKey,
-        niche: detectedNiche || null,
-        productsFound: productsFound || [],
-        locationSignals: locationSignals || null,
-        categories: categoryLabels,
-        customerType,
-        questions,
-        riskNarrative,
-        confidence: gemini.confidence_score,
-        analysisNotes: gemini.analysis_notes,
+        summary, primary: primaryKey, niche: detectedNiche || null,
+        productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps,
+        locationSignals: locationSignals || null, categories: categoryLabels,
+        customerType, questions, questionsRich, riskNarrative,
+        confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes,
       });
     }
     // No Gemini key or Gemini failed — ask user to pick category manually
@@ -970,9 +1031,11 @@ module.exports = async (req, res) => {
   }
 
   // ── Classify: try Gemini first, fall back to rules-based ─────────────────────
-  let primary, categories, summary, questions, customerType, aiAssisted = false;
+  let primary, categories, summary, questions, questionsRich = [], customerType, aiAssisted = false;
   let aiExtras = {};
-  let detectedNiche = null, productsFound = [], organisationName = '', locationSignals = null;
+  let detectedNiche = null, productsFound = [], productsStructured = [];
+  let customerChannels = [], publicSignals = [], visibilityGaps = [];
+  let organisationName = '', locationSignals = null;
 
   if (override) {
     ({ primary, categories } = override);
@@ -980,17 +1043,18 @@ module.exports = async (req, res) => {
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
-      questions = mapped.questions;
+      questions = mapped.questions; questionsRich = mapped.questionsRich;
       summary = mapped.summary || buildSummary(extracted, brandName || extracted.title);
-      customerType = mapped.customerType;
-      detectedNiche = mapped.detectedNiche || null;
-      productsFound = mapped.productsFound || [];
+      customerType = mapped.customerType; detectedNiche = mapped.detectedNiche || null;
+      productsFound = mapped.productsFound || []; productsStructured = mapped.productsStructured || [];
+      customerChannels = mapped.customerChannels || []; publicSignals = mapped.publicSignals || [];
+      visibilityGaps = mapped.visibilityGaps || [];
       organisationName = mapped.organisationName || mapped.brandName || '';
       locationSignals = mapped.locationSignals || null;
       aiAssisted = true;
       aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
     } else {
-      questions = buildQuestions(categories);
+      questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, why_relevant: '' }));
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
       if (geminiRaw?._error) aiExtras = { geminiError: geminiRaw._error };
@@ -1000,20 +1064,20 @@ module.exports = async (req, res) => {
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
-      primary = mapped.primaryKey;
-      categories = mapped.categories;
-      questions = mapped.questions;
+      primary = mapped.primaryKey; categories = mapped.categories;
+      questions = mapped.questions; questionsRich = mapped.questionsRich;
       summary = mapped.summary || buildSummary(extracted, brandName || extracted.title);
-      customerType = mapped.customerType;
-      detectedNiche = mapped.detectedNiche || null;
-      productsFound = mapped.productsFound || [];
+      customerType = mapped.customerType; detectedNiche = mapped.detectedNiche || null;
+      productsFound = mapped.productsFound || []; productsStructured = mapped.productsStructured || [];
+      customerChannels = mapped.customerChannels || []; publicSignals = mapped.publicSignals || [];
+      visibilityGaps = mapped.visibilityGaps || [];
       organisationName = mapped.organisationName || mapped.brandName || '';
       locationSignals = mapped.locationSignals || null;
       aiAssisted = true;
       aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
     } else {
       ({ primary, categories } = detectCategories(extracted));
-      questions = buildQuestions(categories);
+      questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, why_relevant: '' }));
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
       if (geminiRaw?._error) aiExtras = { geminiError: geminiRaw._error };
@@ -1027,24 +1091,15 @@ module.exports = async (req, res) => {
   }));
 
   res.status(200).json({
-    fetchedOk,
-    needsManualCategory: false,
-    analysis_status: analysisStatus,
-    aiAssisted,
-    manual: false,
-    title: displayTitle,
-    ogTitle: extracted.ogTitle,
-    metaDescription: extracted.metaDesc,
-    organisationName: organisationName || null,
-    summary,
-    primary,
-    niche: detectedNiche || null,
-    productsFound,
+    fetchedOk, needsManualCategory: false, analysis_status: analysisStatus,
+    aiAssisted, manual: false,
+    title: displayTitle, ogTitle: extracted.ogTitle, metaDescription: extracted.metaDesc,
+    organisationName: organisationName || null, summary,
+    primary, niche: detectedNiche || null,
+    productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps,
     locationSignals: locationSignals || null,
-    categories: categoryLabels,
-    customerType,
-    questions,
-    riskNarrative,
+    categories: categoryLabels, customerType,
+    questions, questionsRich, riskNarrative,
     geminiKeyPresent: !!process.env.GEMINI_API_KEY,
     ...aiExtras,
   });
