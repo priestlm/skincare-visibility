@@ -614,7 +614,6 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName) {
     ],
     temperature: 0.2,
     max_tokens: 3000,
-    response_format: { type: 'json_object' },
   };
   try {
     const result = await postJson(endpoint, payload, 25000, { Authorization: `Bearer ${apiKey}` });
@@ -644,17 +643,19 @@ function callGroq(prompt) {
 }
 
 // OpenRouter — works from Vercel, free tier, no credit card required
-// Free models: meta-llama/llama-3.1-8b-instruct:free, mistralai/mistral-7b-instruct:free
-function callOpenRouter(prompt) {
+async function callOpenRouter(prompt) {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) return Promise.resolve(null);
-  return callOpenAICompat(
-    'https://openrouter.ai/api/v1/chat/completions',
-    'meta-llama/llama-3.1-8b-instruct:free',
-    apiKey,
-    prompt,
-    'OpenRouter',
-  );
+  if (!apiKey) return null;
+  const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+  // Try two free models in sequence
+  const models = ['google/gemma-2-9b-it:free', 'meta-llama/llama-3.1-8b-instruct:free'];
+  let lastErr;
+  for (const model of models) {
+    const result = await callOpenAICompat(endpoint, model, apiKey, prompt, `OpenRouter(${model})`);
+    if (result && !result._error) return result;
+    lastErr = result;
+  }
+  return lastErr || { _error: 'openrouter_all_failed' };
 }
 
 // â”€â”€ AI orchestrator: Gemini â†' Groq â†' OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -670,8 +671,8 @@ async function callAI(extracted, targetUrl, analysisStatus) {
   const openRouterResult = await callOpenRouter(prompt);
   if (openRouterResult && !openRouterResult._error) return openRouterResult;
 
-  // Both failed â€” return the Gemini error (or Groq error if no Gemini key)
-  return geminiResult || groqResult || { _error: 'no_ai_provider' };
+  // All failed — return most informative error
+  return openRouterResult || geminiResult || groqResult || { _error: 'no_ai_provider' };
 }
 
 // â”€â”€ Niche question templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
