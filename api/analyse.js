@@ -768,6 +768,27 @@ const NICHE_QUESTIONS = {
     'best British gin brands',
     'best gin gift sets UK',
   ],
+  'brewery': [
+    'where can I get local craft beer delivered to my door?',
+    'what\'s a good independent brewery to visit in the UK?',
+    'I\'m looking for a local brewery that supplies pubs — any recommendations?',
+    'can you recommend a brewery in the South West with a tap room to visit?',
+    'where can I buy locally brewed ales online?',
+  ],
+  'craft beer': [
+    'where can I get local craft beer delivered to my door?',
+    'what\'s a good independent brewery to visit in the UK?',
+    'I\'m looking for a craft beer subscription in the UK — any good ones?',
+    'can you recommend a pub that stocks local craft ales?',
+    'where can I buy small-batch British ales online?',
+  ],
+  'cask ale': [
+    'where can I find real ale from a local brewery?',
+    'what\'s a good cask ale brewery to visit in the UK?',
+    'I\'m looking for a pub that serves local cask ales — any recommendations?',
+    'where can I order traditional British ales online?',
+    'can you recommend a brewery in the South West that does tours?',
+  ],
 };
 
 // Exclusive terms per category â€” words that signal a question belongs to THAT category only.
@@ -974,14 +995,40 @@ function buildRiskNarrative(brandName, primary, categories) {
   return `When shoppers ask AI assistants for ${catLabel}${multi} recommendations, they typically receive 3â€“5 brand names. Based on ${name}'s public website signals, we've identified the question types where visibility gaps are most likely. The full report shows which queries are relevant to your brand and which competitors are appearing instead.`;
 }
 
-function buildQuestions(categories) {
+// Detect niche from raw text signals without AI
+const NICHE_KEYWORDS = [
+  { niche: 'brewery',  terms: ['brewery', 'brewed', 'cask ale', 'craft beer', 'ales', 'lager', 'hops', 'brewing'] },
+  { niche: 'craft beer', terms: ['craft beer', 'craft ale', 'craft lager', 'microbrewery'] },
+  { niche: 'cask ale', terms: ['cask ale', 'real ale', 'cask conditioned', 'hand pump'] },
+  { niche: 'speciality coffee', terms: ['speciality coffee', 'specialty coffee', 'single origin', 'coffee roaster', 'espresso'] },
+  { niche: 'craft gin', terms: ['craft gin', 'gin distillery', 'small batch gin', 'botanical gin'] },
+  { niche: 'artisan chocolate', terms: ['bean to bar', 'artisan chocolate', 'craft chocolate', 'cacao'] },
+];
+
+function detectNicheFromText(extracted) {
+  const text = [extracted.title, extracted.metaDesc, extracted.ogTitle, extracted.ogDesc, (extracted.headings || []).join(' '), (extracted.bodyText || '').slice(0, 500)].join(' ').toLowerCase();
+  for (const { niche, terms } of NICHE_KEYWORDS) {
+    if (terms.some(t => text.includes(t))) return niche;
+  }
+  return null;
+}
+
+function buildQuestions(categories, niche) {
   const seen = new Set();
   const out = [];
-  for (const cat of categories) {
-    for (const q of (QUESTIONS[cat] || [])) {
+  // Niche questions first if available
+  if (niche) {
+    for (const q of (NICHE_QUESTIONS[niche] || [])) {
       if (!seen.has(q) && out.length < 5) { seen.add(q); out.push(q); }
     }
-    if (out.length >= 5) break;
+  }
+  if (out.length < 5) {
+    for (const cat of categories) {
+      for (const q of (QUESTIONS[cat] || [])) {
+        if (!seen.has(q) && out.length < 5) { seen.add(q); out.push(q); }
+      }
+      if (out.length >= 5) break;
+    }
   }
   return out;
 }
@@ -1163,12 +1210,12 @@ module.exports = async (req, res) => {
     } else {
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
+      const kwNiche = detectNicheFromText(extracted);
       if (geminiRaw?._error) {
         aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '', rateLimitFallback: true };
-        // Always show keyword questions — tool must remain useful regardless of AI error type
-        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
+        questions = buildQuestions(categories, kwNiche); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
       } else {
-        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
+        questions = buildQuestions(categories, kwNiche); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
       }
     }
   } else {
@@ -1191,12 +1238,12 @@ module.exports = async (req, res) => {
       ({ primary, categories } = detectCategories(extracted));
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
+      const kwNiche = detectNicheFromText(extracted);
       if (geminiRaw?._error) {
         aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '', rateLimitFallback: true };
-        // Always show keyword questions — tool must remain useful regardless of AI error type
-        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
+        questions = buildQuestions(categories, kwNiche); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
       } else {
-        questions = buildQuestions(categories); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
+        questions = buildQuestions(categories, kwNiche); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
       }
     }
   }
