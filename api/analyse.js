@@ -215,7 +215,7 @@ const CATEGORY_DEFS = {
   },
 };
 
-// Reverse map: Gemini label â†’ internal key
+// Reverse map: Gemini label â†' internal key
 const LABEL_TO_KEY = {};
 for (const [key, def] of Object.entries(CATEGORY_DEFS)) {
   LABEL_TO_KEY[def.label.toLowerCase()] = key;
@@ -542,7 +542,7 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus) {
 }
 
 RULES:
-1. Classify from evidence. Brewery â†’ "Food & drink". Skincare â†’ "Beauty & skincare".
+1. Classify from evidence. Brewery â†' "Food & drink". Skincare â†' "Beauty & skincare".
 2. allowed_topics: ONLY topics found in the signals. Nothing invented.
 3. Questions must sound like a real person talking to ChatGPT â€” casual, plain English, not marketing copy. FORBIDDEN WORDS: award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, bespoke, curated, hospitality supplier. Also forbidden: business name, brand name, "you", "your".
    GOOD: "I'm looking for a local brewery in Cornwall that sells to pubs â€” any recommendations?" / "where can I get Cornish beer delivered?" / "what's a good brewery near Truro to visit for a day out?"
@@ -609,12 +609,12 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName) {
   const payload = {
     model,
     messages: [
-      { role: ‘system’, content: ‘You are a business analyst. Return only valid JSON — no markdown, no code fences.’ },
-      { role: ‘user’, content: prompt },
+      { role: 'system', content: 'You are a business analyst. Return only valid JSON. No markdown, no code fences.' },
+      { role: 'user', content: prompt },
     ],
     temperature: 0.2,
     max_tokens: 3000,
-    response_format: { type: ‘json_object’ },
+    response_format: { type: 'json_object' },
   };
   try {
     const result = await postJson(endpoint, payload, 25000, { Authorization: `Bearer ${apiKey}` });
@@ -622,8 +622,8 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName) {
       console.error(`${providerName} error`, result.status, JSON.stringify(result.body).slice(0, 200));
       return { _error: `${providerName.toLowerCase()}_status_${result.status}` };
     }
-    const text = result.body?.choices?.[0]?.message?.content || ‘’;
-    const cleaned = text.replace(/```(?:json)?/gi, ‘’).replace(/```/g, ‘’).trim();
+    const text = result.body?.choices?.[0]?.message?.content || '';
+    const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleaned);
     if (!parsed.primary_category || !parsed.example_ai_shopping_questions) {
       return { _error: `${providerName.toLowerCase()}_missing_fields` };
@@ -640,7 +640,7 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName) {
 function callGroq(prompt) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return Promise.resolve(null);
-  return callOpenAICompat(‘https://api.groq.com/openai/v1/chat/completions’, ‘llama-3.1-8b-instant’, apiKey, prompt, ‘Groq’);
+  return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', apiKey, prompt, 'Groq');
 }
 
 // OpenRouter — works from Vercel, free tier, no credit card required
@@ -649,15 +649,15 @@ function callOpenRouter(prompt) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) return Promise.resolve(null);
   return callOpenAICompat(
-    ‘https://openrouter.ai/api/v1/chat/completions’,
-    ‘meta-llama/llama-3.1-8b-instruct:free’,
+    'https://openrouter.ai/api/v1/chat/completions',
+    'meta-llama/llama-3.1-8b-instruct:free',
     apiKey,
     prompt,
-    ‘OpenRouter’,
+    'OpenRouter',
   );
 }
 
-// â”€â”€ AI orchestrator: Gemini â†’ Groq â†’ OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ AI orchestrator: Gemini â†' Groq â†' OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function callAI(extracted, targetUrl, analysisStatus) {
   const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus);
 
@@ -1089,7 +1089,7 @@ module.exports = async (req, res) => {
     fetchedOk = true;
   }
 
-  // No override and blocked/failed â†’ try Gemini with domain-only signal, else ask user
+  // No override and blocked/failed â†' try Gemini with domain-only signal, else ask user
   if (!override && (analysisStatus === 'blocked' || analysisStatus === 'failed')) {
     const geminiRaw = await callAI(extracted, targetUrl, analysisStatus);
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
