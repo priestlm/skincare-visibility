@@ -570,7 +570,10 @@ ${signalsBlock}`;
       generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
     });
 
-    if (result.status !== 200) return null;
+    if (result.status !== 200) {
+      console.error('Gemini API error', result.status, JSON.stringify(result.body).slice(0, 300));
+      return { _error: `api_status_${result.status}` };
+    }
 
     const text = result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     // Strip any accidental markdown fences
@@ -578,11 +581,14 @@ ${signalsBlock}`;
     const parsed = JSON.parse(cleaned);
 
     // Validate required fields
-    if (!parsed.primary_category || !parsed.example_ai_shopping_questions) return null;
+    if (!parsed.primary_category || !parsed.example_ai_shopping_questions) {
+      return { _error: 'missing_fields' };
+    }
 
     return parsed;
-  } catch {
-    return null;
+  } catch (err) {
+    console.error('Gemini call failed:', err.message);
+    return { _error: err.message || 'unknown' };
   }
 }
 
@@ -723,8 +729,8 @@ module.exports = async (req, res) => {
 
   // No override and blocked/failed → try Gemini with domain-only signal, else ask user
   if (!override && (analysisStatus === 'blocked' || analysisStatus === 'failed')) {
-    // Attempt AI classification using just the URL/domain if Gemini key is available
-    const gemini = await callGemini(extracted, targetUrl, analysisStatus);
+    const geminiRaw = await callGemini(extracted, targetUrl, analysisStatus);
+    const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const { primaryKey, categories, questions, brandName: aiBrand, summary, customerType } = applyGeminiResult(gemini, brandName);
       const riskNarrative = buildRiskNarrative(aiBrand || brandName, primaryKey, categories);
@@ -738,6 +744,7 @@ module.exports = async (req, res) => {
         needsManualCategory: false,
         analysis_status: analysisStatus,
         aiAssisted: true,
+        geminiKeyPresent: true,
         manual: false,
         title: aiBrand || brandName || targetUrl,
         summary,
@@ -755,6 +762,8 @@ module.exports = async (req, res) => {
       fetchedOk: false,
       needsManualCategory: true,
       aiAssisted: false,
+      geminiKeyPresent: !!process.env.GEMINI_API_KEY,
+      geminiError: geminiRaw?._error || null,
       analysis_status: analysisStatus,
       title: '',
       summary: '',
@@ -772,10 +781,10 @@ module.exports = async (req, res) => {
   if (override) {
     // Domain override — run Gemini on top of override signals for richer questions/summary
     ({ primary, categories } = override);
-    const gemini = await callGemini(extracted, targetUrl, 'ok');
+    const geminiRaw = await callGemini(extracted, targetUrl, 'ok');
+    const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
-      // Keep override categories but use AI questions and summary if better
       questions = mapped.questions;
       summary = mapped.summary || buildSummary(extracted, brandName || extracted.title);
       customerType = mapped.customerType;
@@ -785,10 +794,12 @@ module.exports = async (req, res) => {
       questions = buildQuestions(categories);
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
+      if (geminiRaw?._error) aiExtras = { geminiError: geminiRaw._error };
     }
   } else {
     // Fetched ok — try Gemini, fall back to rules
-    const gemini = await callGemini(extracted, targetUrl, analysisStatus);
+    const geminiRaw = await callGemini(extracted, targetUrl, analysisStatus);
+    const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
       primary = mapped.primaryKey;
@@ -803,6 +814,7 @@ module.exports = async (req, res) => {
       questions = buildQuestions(categories);
       summary = buildSummary(extracted, brandName || extracted.title);
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
+      if (geminiRaw?._error) aiExtras = { geminiError: geminiRaw._error };
     }
   }
 
@@ -828,6 +840,7 @@ module.exports = async (req, res) => {
     customerType,
     questions,
     riskNarrative,
+    geminiKeyPresent: !!process.env.GEMINI_API_KEY,
     ...aiExtras,
   });
 };
