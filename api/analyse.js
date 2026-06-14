@@ -823,43 +823,35 @@ function applyGeminiResult(gemini, brandNameInput) {
     return null;
   }).filter(Boolean).filter(q => q.question.length > 5).slice(0, 5);
 
-  // Niche template lookup
+  // Niche template lookup — only used for rules-based fallback path (no Gemini)
   const nicheLower = detectedNiche.toLowerCase();
   const nicheTemplate = Object.entries(NICHE_QUESTIONS)
     .find(([k]) => nicheLower.includes(k))?.[1] || null;
-  const categoryTemplate = QUESTIONS[primaryKey] || QUESTIONS.other;
 
-  // Validate questions: must not contain exclusive terms from a different category
-  // AND if products known, must relate to at least one
-  const productTerms = productsFound.map(p => p.toLowerCase());
-  function questionIsValid(q) {
-    const ql = q.question.toLowerCase();
-    if (questionMismatch(ql, primaryKey)) return false;
-    if (productTerms.length >= 2) {
-      const nicheWords = nicheLower.split(/[\s\/,]+/).filter(w => w.length > 3);
-      return [...productTerms, ...nicheWords].some(t => ql.includes(t));
-    }
-    return true;
-  }
+  // When Gemini provided questions: trust them.
+  // Only strip cross-category contamination (questionMismatch).
+  // Do NOT require product terms to appear verbatim — Gemini's prompt already
+  // ensured questions are business-specific. Applying a product-term substring
+  // check strips valid questions (e.g. "best South West brewery" doesn't contain
+  // "Tribute Pale Ale") and causes the generic food category bank to appear instead.
+  const validQs = normalisedQs.filter(q => !questionMismatch(q.question.toLowerCase(), primaryKey));
 
-  const validQs = normalisedQs.filter(questionIsValid);
-
-  // Pad with fallbacks (as plain strings, no why_relevant)
-  const fallbackPool = nicheTemplate ? [...nicheTemplate, ...categoryTemplate] : [...categoryTemplate];
-  const seen = new Set(validQs.map(q => q.question.toLowerCase()));
+  // When AI-assisted: NEVER pad with generic category questions.
+  // Use only niche-specific templates (if any), then stop.
+  // If < 3 questions survive, mark weakEvidence so the UI can show a warning.
+  let weakEvidence = false;
   const finalQs = [...validQs];
-  for (const q of fallbackPool) {
-    if (finalQs.length >= 5) break;
-    if (!seen.has(q.toLowerCase())) {
-      finalQs.push({ question: q, why_relevant: '' });
-      seen.add(q.toLowerCase());
+  if (finalQs.length < 5 && nicheTemplate) {
+    const seen = new Set(finalQs.map(q => q.question.toLowerCase()));
+    for (const q of nicheTemplate) {
+      if (finalQs.length >= 5) break;
+      if (!seen.has(q.toLowerCase())) {
+        finalQs.push({ question: q, why_relevant: '' });
+        seen.add(q.toLowerCase());
+      }
     }
   }
-  if (finalQs.length < 2) {
-    (nicheTemplate || categoryTemplate).slice(0, 5).forEach(q => {
-      if (finalQs.length < 5) finalQs.push({ question: q, why_relevant: '' });
-    });
-  }
+  if (finalQs.length < 3) weakEvidence = true;
 
   // For backward-compat: also expose plain string array
   const questionsPlain = finalQs.map(q => q.question);
@@ -872,6 +864,7 @@ function applyGeminiResult(gemini, brandNameInput) {
     primaryKey, categories,
     questions: questionsPlain,
     questionsRich: finalQs,
+    weakEvidence,
     brandName, organisationName, summary, customerType,
     detectedNiche, productsFound, productsStructured,
     customerChannels, publicSignals, visibilityGaps, locationSignals,
@@ -996,7 +989,7 @@ module.exports = async (req, res) => {
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName);
-      const { primaryKey, categories, questions, questionsRich, brandName: aiBrand, organisationName, summary, customerType, detectedNiche, productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
+      const { primaryKey, categories, questions, questionsRich, weakEvidence, brandName: aiBrand, organisationName, summary, customerType, detectedNiche, productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
       const riskNarrative = buildRiskNarrative(aiBrand || brandName, primaryKey, categories);
       const categoryLabels = categories.map(c => ({
         key: c, label: CATEGORY_DEFS[c]?.label || c, primary: c === primaryKey,
@@ -1009,7 +1002,7 @@ module.exports = async (req, res) => {
         summary, primary: primaryKey, niche: detectedNiche || null,
         productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps,
         locationSignals: locationSignals || null, categories: categoryLabels,
-        customerType, questions, questionsRich, riskNarrative,
+        customerType, questions, questionsRich, weakEvidence: weakEvidence || false, riskNarrative,
         confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes,
       });
     }
@@ -1032,7 +1025,7 @@ module.exports = async (req, res) => {
 
   // ── Classify: try Gemini first, fall back to rules-based ─────────────────────
   let primary, categories, summary, questions, questionsRich = [], customerType, aiAssisted = false;
-  let aiExtras = {};
+  let aiExtras = {}, weakEvidence = false;
   let detectedNiche = null, productsFound = [], productsStructured = [];
   let customerChannels = [], publicSignals = [], visibilityGaps = [];
   let organisationName = '', locationSignals = null;
@@ -1043,7 +1036,7 @@ module.exports = async (req, res) => {
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
-      questions = mapped.questions; questionsRich = mapped.questionsRich;
+      questions = mapped.questions; questionsRich = mapped.questionsRich; weakEvidence = mapped.weakEvidence || false;
       summary = mapped.summary || buildSummary(extracted, brandName || extracted.title);
       customerType = mapped.customerType; detectedNiche = mapped.detectedNiche || null;
       productsFound = mapped.productsFound || []; productsStructured = mapped.productsStructured || [];
@@ -1065,7 +1058,7 @@ module.exports = async (req, res) => {
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
       primary = mapped.primaryKey; categories = mapped.categories;
-      questions = mapped.questions; questionsRich = mapped.questionsRich;
+      questions = mapped.questions; questionsRich = mapped.questionsRich; weakEvidence = mapped.weakEvidence || false;
       summary = mapped.summary || buildSummary(extracted, brandName || extracted.title);
       customerType = mapped.customerType; detectedNiche = mapped.detectedNiche || null;
       productsFound = mapped.productsFound || []; productsStructured = mapped.productsStructured || [];
@@ -1099,7 +1092,7 @@ module.exports = async (req, res) => {
     productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps,
     locationSignals: locationSignals || null,
     categories: categoryLabels, customerType,
-    questions, questionsRich, riskNarrative,
+    questions, questionsRich, weakEvidence, riskNarrative,
     geminiKeyPresent: !!process.env.GEMINI_API_KEY,
     ...aiExtras,
   });

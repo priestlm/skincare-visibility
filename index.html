@@ -507,18 +507,27 @@
       prodEl.style.display = 'none';
     }
 
-    // Questions label — use niche if available
+    // Questions label
     var qLabel = document.getElementById('result-q-label');
-    qLabel.textContent = data.niche
-      ? 'Example AI-shopping questions — ' + data.niche
-      : 'Example AI-shopping questions in your category';
+    qLabel.textContent = data.aiAssisted
+      ? 'AI-search questions based on this business'
+      : (data.niche ? 'Example AI-shopping questions — ' + data.niche : 'Example AI-shopping questions in your category');
 
     // Questions — use questionsRich (with why_relevant) if available, else plain
     var qEl = document.getElementById('result-questions');
     qEl.innerHTML = '';
-    var richQs = Array.isArray(data.questionsRich) && data.questionsRich.length > 0
+
+    // If AI couldn't generate reliable business-specific questions, say so
+    if (data.weakEvidence) {
+      var weak = document.createElement('p');
+      weak.style.cssText = 'font-size:13px;color:var(--ink-soft);font-style:italic;margin:0';
+      weak.textContent = 'Unable to generate reliable business-specific questions from the available evidence.';
+      qEl.appendChild(weak);
+    }
+
+    var richQs = Array.isArray(data.questionsRich) && data.questionsRich.length > 0 && !data.weakEvidence
       ? data.questionsRich
-      : (data.questions || []).map(function(q){ return { question: q, why_relevant: '' }; });
+      : (!data.weakEvidence ? (data.questions || []).map(function(q){ return { question: q, why_relevant: '' }; }) : []);
     richQs.forEach(function (qObj) {
       var qText = typeof qObj === 'string' ? qObj : (qObj.question || '');
       var why   = typeof qObj === 'object' ? (qObj.why_relevant || '') : '';
