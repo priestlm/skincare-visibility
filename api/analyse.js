@@ -649,9 +649,9 @@ async function callOpenRouter(prompt) {
   const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
   // Current free models (June 2026) — try in order
   const models = [
-    'deepseek/deepseek-r1:free',
     'meta-llama/llama-3.3-70b-instruct:free',
-    'mistralai/mistral-7b-instruct:free',
+    'nvidia/nemotron-3-super-120b-a12b:free',
+    'openai/gpt-oss-20b:free',
   ];
   let lastErr;
   for (const model of models) {
