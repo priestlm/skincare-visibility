@@ -184,6 +184,26 @@
     font-size:14px;color:var(--ink-soft);line-height:1.55;
   }
   .result-fetch-warn{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--missing);margin-top:10px;letter-spacing:.02em}
+  .result-q-wrap{cursor:pointer}
+  .result-q-wrap .result-q{transition:background .15s,border-color .15s}
+  .result-q-wrap:hover .result-q{background:rgba(92,46,67,.07);border-color:rgba(92,46,67,.25)}
+  .result-q-wrap .result-q::after{content:"▸";margin-left:auto;flex:none;font-size:10px;color:var(--ink-soft);transition:transform .2s}
+  .result-q-wrap.open .result-q::after{transform:rotate(90deg)}
+  .ask-panel{
+    margin:4px 0 0 0;padding:12px 14px;border-radius:9px;
+    background:#fff;border:1px solid var(--line);
+    display:none;font-size:13px;line-height:1.55;color:var(--ink);
+  }
+  .ask-panel.visible{display:block}
+  .ask-panel-intro{color:var(--ink-soft);margin:0 0 10px;font-style:italic;font-size:12.5px}
+  .ask-panel-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+  .ask-panel-item{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:7px;background:var(--porcelain);border:1px solid var(--line)}
+  .ask-panel-item.highlighted{background:rgba(15,118,110,.07);border-color:rgba(15,118,110,.3)}
+  .ask-panel-name{font-weight:600;color:var(--ink);min-width:0;flex:none;max-width:130px;word-break:break-word}
+  .ask-panel-reason{color:var(--ink-soft);font-size:12px;margin:0}
+  .ask-panel-yours{font-size:11px;font-weight:600;color:#0f766e;background:rgba(15,118,110,.1);border-radius:4px;padding:1px 6px;flex:none;margin-top:2px}
+  .ask-panel-loading{color:var(--ink-soft);font-size:12px;font-style:italic}
+  .ask-panel-error{color:var(--missing);font-size:12px}
 
   /* ---- shift band ---- */
   .band{background:var(--ink);color:var(--porcelain);padding:74px 0}
@@ -523,11 +543,13 @@
     var richQs = Array.isArray(data.questionsRich) && data.questionsRich.length > 0
       ? data.questionsRich
       : (data.questions || []).map(function(q){ return { question: q, search_intent: '' }; });
+    var _askBusinessName = orgName || brandName || '';
     richQs.forEach(function (qObj) {
       var qText   = typeof qObj === 'string' ? qObj : (qObj.question || '');
       var intent  = typeof qObj === 'object' ? (qObj.search_intent || qObj.why_relevant || '') : '';
       if (!qText) return;
       var wrap = document.createElement('div');
+      wrap.className = 'result-q-wrap';
       wrap.style.marginBottom = '6px';
       var d = document.createElement('div');
       d.className = 'result-q';
@@ -539,8 +561,61 @@
         w.textContent = intent;
         wrap.appendChild(w);
       }
+      // Expandable AI response panel
+      var panel = document.createElement('div');
+      panel.className = 'ask-panel';
+      wrap.appendChild(panel);
+      wrap.addEventListener('click', function() {
+        var isOpen = wrap.classList.contains('open');
+        // Close all others
+        qEl.querySelectorAll('.result-q-wrap.open').forEach(function(el){ el.classList.remove('open'); el.querySelector('.ask-panel').classList.remove('visible'); });
+        if (isOpen) return;
+        wrap.classList.add('open');
+        panel.classList.add('visible');
+        if (panel.dataset.loaded) return;
+        panel.dataset.loaded = '1';
+        panel.innerHTML = '<p class="ask-panel-loading">Asking AI what it recommends…</p>';
+        fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: qText, businessName: _askBusinessName }),
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+          if (data.error || !Array.isArray(data.recommendations) || data.recommendations.length === 0) {
+            panel.innerHTML = '<p class="ask-panel-error">Could not load AI response right now — try again shortly.</p>';
+            return;
+          }
+          var html = '';
+          if (data.intro) html += '<p class="ask-panel-intro">' + escHtml(data.intro) + '</p>';
+          html += '<ul class="ask-panel-list">';
+          data.recommendations.forEach(function(rec) {
+            var bizLower = _askBusinessName.toLowerCase();
+            var recLower = (rec.name || '').toLowerCase();
+            var isYours = bizLower.length > 2 && (recLower.includes(bizLower) || bizLower.includes(recLower));
+            html += '<li class="ask-panel-item' + (isYours ? ' highlighted' : '') + '">';
+            html += '<div style="display:flex;flex-direction:column;gap:3px;flex:none;min-width:0;max-width:130px">';
+            html += '<span class="ask-panel-name">' + escHtml(rec.name || '') + '</span>';
+            if (isYours) html += '<span class="ask-panel-yours">Your business</span>';
+            html += '</div>';
+            html += '<p class="ask-panel-reason">' + escHtml(rec.reason || '') + '</p>';
+            html += '</li>';
+          });
+          html += '</ul>';
+          if (!data.businessMentioned && _askBusinessName) {
+            html += '<p style="font-size:11px;color:var(--ink-soft);margin:8px 0 0;font-style:italic">&#9888; ' + escHtml(_askBusinessName) + ' was not in this AI response. This represents a visibility gap.</p>';
+          }
+          panel.innerHTML = html;
+        })
+        .catch(function() {
+          panel.innerHTML = '<p class="ask-panel-error">Could not load AI response right now — try again shortly.</p>';
+        });
+      });
       qEl.appendChild(wrap);
     });
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
 
     // Soft note when falling back to general questions
     if (data.rateLimitFallback && richQs.length > 0) {
