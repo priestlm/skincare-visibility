@@ -163,6 +163,7 @@
   }
   .cat-tag.primary{background:rgba(92,46,67,.12);color:var(--plum)}
   .cat-tag.secondary{background:rgba(92,46,67,.05);color:var(--ink-soft);border:1px solid var(--line)}
+  .cat-tag.niche{background:rgba(15,118,110,.08);color:#0f766e;border:1px solid rgba(15,118,110,.18)}
   .result-summary{color:var(--ink-soft);font-size:15px;margin:8px 0 18px;line-height:1.55}
   .result-questions{display:flex;flex-direction:column;gap:6px}
   .result-q{
@@ -453,12 +454,22 @@
     // Category tags
     var tagEl = document.getElementById('result-categories');
     tagEl.innerHTML = '';
+    var confidence = typeof data.confidence === 'number' ? data.confidence : 1;
+    var showSecondary = !data.aiAssisted || confidence >= 0.7;
     (data.categories || []).forEach(function (c) {
+      if (!c.primary && !showSecondary) return;
       var t = document.createElement('span');
       t.className = 'cat-tag ' + (c.primary ? 'primary' : 'secondary');
       t.textContent = c.label;
       tagEl.appendChild(t);
     });
+    // Niche chip — shown as "Focus area: X" if detected
+    if (data.niche) {
+      var n = document.createElement('span');
+      n.className = 'cat-tag niche';
+      n.textContent = 'Focus area: ' + data.niche;
+      tagEl.appendChild(n);
+    }
 
     // Summary
     var summary = data.summary || 'Initial analysis based on public website signals.';
