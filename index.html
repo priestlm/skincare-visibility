@@ -164,7 +164,9 @@
   .cat-tag.primary{background:rgba(92,46,67,.12);color:var(--plum)}
   .cat-tag.secondary{background:rgba(92,46,67,.05);color:var(--ink-soft);border:1px solid var(--line)}
   .cat-tag.niche{background:rgba(15,118,110,.08);color:#0f766e;border:1px solid rgba(15,118,110,.18)}
-  .result-summary{color:var(--ink-soft);font-size:15px;margin:8px 0 18px;line-height:1.55}
+  .result-org{font-size:13px;font-weight:600;color:var(--plum);letter-spacing:.01em;margin:0 0 6px;text-transform:uppercase}
+  .result-products{font-size:12px;color:var(--ink-soft);background:var(--porcelain);border:1px solid var(--line);border-radius:8px;padding:7px 11px;margin:0 0 14px;line-height:1.5}
+  .result-summary{color:var(--ink-soft);font-size:15px;margin:8px 0 14px;line-height:1.55}
   .result-questions{display:flex;flex-direction:column;gap:6px}
   .result-q{
     font-family:"JetBrains Mono",monospace;font-size:12.5px;color:var(--ink);
@@ -308,15 +310,18 @@
       <div id="step-email" class="step">
         <p style="font-family:'Newsreader',serif;font-size:1.12rem;margin-bottom:14px;line-height:1.35">Your initial preview is ready. Enter your email to receive the <em>full visibility report.</em></p>
         <form class="email-form" id="hero-form" action="https://formspree.io/f/mojzkvgo" method="POST" data-form>
-          <input type="hidden" name="website_url"        id="h-url">
-          <input type="hidden" name="brand_name"        id="h-brand">
-          <input type="hidden" name="market"            id="h-market">
-          <input type="hidden" name="analysis_status"   id="h-status">
-          <input type="hidden" name="inferred_category" id="h-category">
+          <input type="hidden" name="website_url"          id="h-url">
+          <input type="hidden" name="organisation_name"  id="h-org">
+          <input type="hidden" name="brand_name"         id="h-brand">
+          <input type="hidden" name="market"             id="h-market">
+          <input type="hidden" name="analysis_status"    id="h-status">
+          <input type="hidden" name="inferred_category"  id="h-category">
+          <input type="hidden" name="detected_niche"     id="h-niche">
+          <input type="hidden" name="products_found"     id="h-products">
           <input type="hidden" name="secondary_categories" id="h-categories">
-          <input type="hidden" name="summary"           id="h-summary">
+          <input type="hidden" name="summary"            id="h-summary">
           <input type="hidden" name="generated_questions" id="h-questions">
-          <input type="hidden" name="timestamp"         id="h-timestamp">
+          <input type="hidden" name="timestamp"          id="h-timestamp">
           <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
           <button type="submit">Get report</button>
         </form>
@@ -349,11 +354,13 @@
     <!-- Dynamic result (shown after analysis) -->
     <div id="panel-result" style="display:none">
       <div class="result-card">
-        <div class="ac-top"><span></span><span></span><span></span><em class="lbl" id="result-header">Initial analysis</em></div>
+        <div class="ac-top"><span></span><span></span><span></span><em class="lbl">Initial preview</em></div>
         <div class="ac-body">
+          <p class="result-org" id="result-org" style="display:none"></p>
           <div class="category-tags" id="result-categories"></div>
           <p class="result-summary" id="result-summary"></p>
-          <p class="ans-label">Example AI-shopping questions in your category</p>
+          <p class="result-products" id="result-products" style="display:none"></p>
+          <p class="ans-label" id="result-q-label">Example AI-shopping questions</p>
           <div class="result-questions" id="result-questions"></div>
           <div class="result-narrative" id="result-narrative"></div>
           <p class="result-fetch-warn" id="result-fetch-warn" style="display:none">⚠ Could not read this website directly — preview based on selected category.</p>
@@ -447,9 +454,16 @@
 
   // ── Render result ─────────────────────────────────────────────────────────
   function renderResult(data, inputUrl, brandName, market) {
-    var name = brandName || data.title || inputUrl;
-    document.getElementById('result-header').textContent =
-      (name ? name.slice(0, 36) + (name.length > 36 ? '…' : '') + ' — ' : '') + 'initial preview';
+    var orgName = data.organisationName || data.title || brandName || inputUrl;
+
+    // Organisation name — shown prominently above tags
+    var orgEl = document.getElementById('result-org');
+    if (orgName && orgName !== inputUrl) {
+      orgEl.textContent = orgName;
+      orgEl.style.display = 'block';
+    } else {
+      orgEl.style.display = 'none';
+    }
 
     // Category tags
     var tagEl = document.getElementById('result-categories');
@@ -463,7 +477,6 @@
       t.textContent = c.label;
       tagEl.appendChild(t);
     });
-    // Niche chip — shown as "Focus area: X" if detected
     if (data.niche) {
       var n = document.createElement('span');
       n.className = 'cat-tag niche';
@@ -474,7 +487,23 @@
     // Summary
     var summary = data.summary || 'Initial analysis based on public website signals.';
     document.getElementById('result-summary').textContent =
-      summary.length > 200 ? summary.slice(0, 197) + '…' : summary;
+      summary.length > 220 ? summary.slice(0, 217) + '…' : summary;
+
+    // Products / signals found
+    var prodEl = document.getElementById('result-products');
+    var prods = Array.isArray(data.productsFound) ? data.productsFound.filter(Boolean) : [];
+    if (prods.length > 0) {
+      prodEl.textContent = 'Detected: ' + prods.slice(0, 6).join(' · ');
+      prodEl.style.display = 'block';
+    } else {
+      prodEl.style.display = 'none';
+    }
+
+    // Questions label — use niche if available
+    var qLabel = document.getElementById('result-q-label');
+    qLabel.textContent = data.niche
+      ? 'Example AI-shopping questions — ' + data.niche
+      : 'Example AI-shopping questions in your category';
 
     // Questions
     var qEl = document.getElementById('result-questions');
@@ -495,16 +524,19 @@
     }
 
     // Populate hidden Formspree fields
-    document.getElementById('h-url').value        = inputUrl;
-    document.getElementById('h-brand').value      = brandName;
-    document.getElementById('h-market').value     = market;
-    document.getElementById('h-status').value     = data.analysis_status || 'ok';
-    document.getElementById('h-category').value   = data.primary || '';
+    document.getElementById('h-url').value       = inputUrl;
+    document.getElementById('h-org').value       = orgName;
+    document.getElementById('h-brand').value     = brandName;
+    document.getElementById('h-market').value    = market;
+    document.getElementById('h-status').value    = data.analysis_status || 'ok';
+    document.getElementById('h-category').value  = data.primary || '';
+    document.getElementById('h-niche').value     = data.niche || '';
+    document.getElementById('h-products').value  = prods.join(', ');
     var secondaryCats = (data.categories || []).filter(function(c){ return !c.primary; }).map(function(c){ return c.label; });
     document.getElementById('h-categories').value = secondaryCats.join(', ');
-    document.getElementById('h-summary').value    = summary.slice(0, 300);
-    document.getElementById('h-questions').value  = (data.questions || []).join(' | ');
-    document.getElementById('h-timestamp').value  = new Date().toISOString();
+    document.getElementById('h-summary').value   = summary.slice(0, 300);
+    document.getElementById('h-questions').value = (data.questions || []).join(' | ');
+    document.getElementById('h-timestamp').value = new Date().toISOString();
 
     // Swap panels
     document.getElementById('panel-mock').style.display   = 'none';
