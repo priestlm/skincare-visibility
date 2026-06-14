@@ -631,20 +631,31 @@ Additional rules:
 Website signals:
 ${signalsBlock}`;
 
+  // Model fallback chain — if the primary model is rate-limited, try the next one.
+  const MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-lite'];
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 2000 },
+  };
+
+  let result, usedModel;
   try {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-    const result = await postJson(endpoint, {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 2000 },
-    });
+    for (const model of MODELS) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      result = await postJson(endpoint, payload);
+      usedModel = model;
+      if (result.status === 200) break;
+      // On 429 or 404 try the next model; on other errors stop immediately
+      const bodyStr = JSON.stringify(result.body).slice(0, 400);
+      console.error(`Gemini ${model} error`, result.status, bodyStr);
+      if (result.status !== 429 && result.status !== 404) break;
+    }
 
     if (result.status !== 200) {
-      const bodyStr = JSON.stringify(result.body).slice(0, 400);
-      console.error('Gemini API error', result.status, bodyStr);
-      // Expose error detail so callers can distinguish rate-limit types
       const errDetail = result.body?.error?.message || result.body?.error?.status || '';
       return { _error: `api_status_${result.status}`, _errorDetail: errDetail };
     }
+    console.log(`Gemini model used: ${usedModel}`);
 
     const text = result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     // Strip any accidental markdown fences
