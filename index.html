@@ -4,15 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Does AI recommend your skincare brand? — Free visibility check</title>
-<!--
-  SMOKE-TEST LANDING PAGE — skincare niche
-  PURPOSE: measure whether skincare Shopify founders want an AI-visibility check, BEFORE building the app.
-  TO GO LIVE:
-   1. Replace FORM_ENDPOINT below with your Formspree/Tally/Getform endpoint (all have free tiers).
-   2. Deploy free on Vercel, Netlify, Cloudflare Pages or GitHub Pages (drag-and-drop this file).
-   3. Send ~£50 of traffic (Meta/Reddit ads targeting skincare founders, or post in DTC/Shopify communities).
-   4. Read the signal: signups ÷ visitors. A healthy smoke test converts ~5%+ of targeted visitors.
--->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -62,12 +53,25 @@
   /* ---- hero ---- */
   .hero{display:grid;grid-template-columns:1fr 1.02fr;gap:56px;align-items:center;padding:46px 0 78px}
   .hero-cta{display:flex;flex-direction:column;gap:14px;margin-top:34px;max-width:430px}
-  form{display:flex;gap:9px;background:var(--white);padding:7px;border-radius:14px;border:1px solid var(--line);box-shadow:0 1px 0 rgba(0,0,0,.02)}
-  input[type=email]{
+
+  /* ---- analysis input form ---- */
+  .url-form{display:flex;flex-direction:column;gap:8px}
+  .url-row{display:flex;gap:9px;background:var(--white);padding:7px;border-radius:14px;border:1px solid var(--line);box-shadow:0 1px 0 rgba(0,0,0,.02)}
+  .url-row:focus-within{border-color:var(--plum);box-shadow:0 0 0 3px rgba(92,46,67,.13)}
+  .url-row input{
     flex:1;border:0;background:transparent;padding:13px 14px;font:inherit;font-size:16px;color:var(--ink);min-width:0;
   }
-  input[type=email]::placeholder{color:#a59a90}
-  input[type=email]:focus{outline:none}
+  .url-row input::placeholder{color:#a59a90}
+  .url-row input:focus{outline:none}
+  .optional-row{display:flex;gap:8px}
+  .optional-row input, .optional-row select{
+    flex:1;border:1px solid var(--line);background:var(--white);padding:10px 13px;
+    border-radius:9px;font:inherit;font-size:14.5px;color:var(--ink);min-width:0;
+  }
+  .optional-row input::placeholder{color:#a59a90}
+  .optional-row input:focus,.optional-row select:focus{outline:none;border-color:var(--plum)}
+  .optional-row select{cursor:pointer;color:var(--ink-soft)}
+
   button{
     font:inherit;font-weight:600;font-size:15px;cursor:pointer;border:0;
     background:var(--plum);color:#fff;padding:13px 22px;border-radius:9px;
@@ -75,11 +79,34 @@
   }
   button:hover{background:var(--plum-bright)}
   button:active{transform:translateY(1px)}
-  form:focus-within{border-color:var(--plum);box-shadow:0 0 0 3px rgba(92,46,67,.13)}
+  button:disabled{opacity:.55;cursor:default;transform:none}
+  .btn-full{width:100%}
+
+  /* ---- email capture form ---- */
+  form.email-form{display:flex;gap:9px;background:var(--white);padding:7px;border-radius:14px;border:1px solid var(--line);box-shadow:0 1px 0 rgba(0,0,0,.02)}
+  form.email-form:focus-within{border-color:var(--plum);box-shadow:0 0 0 3px rgba(92,46,67,.13)}
+  form.email-form input[type=email]{
+    flex:1;border:0;background:transparent;padding:13px 14px;font:inherit;font-size:16px;color:var(--ink);min-width:0;
+  }
+  form.email-form input[type=email]::placeholder{color:#a59a90}
+  form.email-form input[type=email]:focus{outline:none}
   .microcopy{font-size:13.5px;color:var(--ink-soft);padding-left:4px}
   .microcopy b{color:var(--ink);font-weight:600}
+  .ok{display:none;font-family:"Hanken Grotesk";font-weight:600;color:var(--sage);padding:13px 4px;font-size:15.5px}
+  .ok.show{display:block}
+  form.done{display:none}
 
-  /* ---- the signature: AI answer card ---- */
+  /* ---- step visibility ---- */
+  .step{display:none}
+  .step.active{display:block}
+
+  /* ---- loading state ---- */
+  .loading-wrap{display:flex;flex-direction:column;gap:10px;padding:6px 0}
+  .loading-label{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--plum);letter-spacing:.04em}
+  .progress-bar{height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--plum);border-radius:2px;width:0%;transition:width .4s ease}
+
+  /* ---- result: answer card ---- */
   .answer-card{
     background:var(--white);border:1px solid var(--line);border-radius:20px;
     box-shadow:var(--shadow);overflow:hidden;
@@ -113,6 +140,36 @@
   @keyframes rise{to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){.absent{animation:none;opacity:1;transform:none}}
 
+  /* ---- result panel ---- */
+  .result-card{
+    background:var(--white);border:1px solid var(--line);border-radius:20px;
+    box-shadow:var(--shadow);overflow:hidden;
+    opacity:0;transform:translateY(12px);
+    animation:rise .5s ease forwards;
+  }
+  .result-badge{
+    display:inline-block;font-family:"JetBrains Mono",monospace;font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;background:rgba(92,46,67,.09);
+    color:var(--plum);border-radius:6px;padding:4px 10px;
+  }
+  .result-summary{color:var(--ink-soft);font-size:15px;margin:10px 0 18px;line-height:1.55}
+  .result-questions{display:flex;flex-direction:column;gap:0}
+  .result-q{
+    font-family:"JetBrains Mono",monospace;font-size:12.5px;color:var(--ink);
+    background:var(--porcelain);border:1px solid var(--line);border-radius:9px;
+    padding:10px 13px;display:flex;gap:8px;align-items:flex-start;margin-bottom:6px;
+  }
+  .result-q::before{content:"›";color:var(--plum);font-weight:600;flex:none}
+  .result-narrative{
+    margin-top:16px;padding:14px 16px;border-radius:11px;
+    background:rgba(92,46,67,.055);border:1px dashed var(--plum);
+    font-size:14px;color:var(--ink-soft);line-height:1.55;
+  }
+  .result-fetch-warn{
+    font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--missing);
+    margin-top:10px;letter-spacing:.02em;
+  }
+
   /* ---- shift band ---- */
   .band{background:var(--ink);color:var(--porcelain);padding:74px 0}
   .band .wrap{display:grid;grid-template-columns:1.1fr 1fr;gap:54px;align-items:center}
@@ -130,10 +187,10 @@
   .how h2{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(1.9rem,3.4vw,2.7rem);letter-spacing:-.01em;max-width:18ch;margin-bottom:48px}
   .how h2 em{font-style:italic;color:var(--plum)}
   .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
-  .step{border-top:2px solid var(--plum);padding-top:18px}
-  .step .n{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--plum);letter-spacing:.06em}
-  .step h3{font-family:"Newsreader",serif;font-weight:500;font-size:1.32rem;margin:10px 0 8px}
-  .step p{color:var(--ink-soft);font-size:15.5px}
+  .step-card{border-top:2px solid var(--plum);padding-top:18px}
+  .step-card .n{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--plum);letter-spacing:.06em}
+  .step-card h3{font-family:"Newsreader",serif;font-weight:500;font-size:1.32rem;margin:10px 0 8px}
+  .step-card p{color:var(--ink-soft);font-size:15.5px}
 
   /* ---- close ---- */
   .close{padding:14px 0 96px}
@@ -145,23 +202,20 @@
   .close-card h2{font-family:"Newsreader",serif;font-weight:400;font-size:clamp(1.8rem,3.6vw,2.8rem);line-height:1.1;letter-spacing:-.01em;margin-bottom:14px}
   .close-card h2 em{font-style:italic;color:#F0C3D1}
   .close-card p{color:#E6D2DA;max-width:46ch;margin:0 auto 30px}
-  .close-card form{max-width:440px;margin:0 auto;background:rgba(255,255,255,.96)}
+  .close-card form.email-form{max-width:440px;margin:0 auto;background:rgba(255,255,255,.96)}
   .close .microcopy{color:#E6D2DA;text-align:center;margin-top:16px}
   .close .microcopy b{color:#fff}
 
   footer{border-top:1px solid var(--line);padding:30px 0 56px;color:var(--ink-soft);font-size:13.5px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
   footer .brandmark{font-size:17px;color:var(--ink)}
 
-  .ok{display:none;font-family:"Hanken Grotesk";font-weight:600;color:var(--sage);padding:13px 4px;font-size:15.5px}
-  .ok.show{display:block}
-  form.done{display:none}
-
   @media (max-width:860px){
     .hero{grid-template-columns:1fr;gap:40px;padding:34px 0 56px}
     .hero-cta{max-width:none}
     .band .wrap{grid-template-columns:1fr;gap:34px}
     .how .steps{grid-template-columns:1fr;gap:26px}
-    .answer-card{order:-1}
+    #panel-result{order:-1}
+    .optional-row{flex-direction:column}
   }
 </style>
 </head>
@@ -178,31 +232,94 @@
   <div class="hero-copy">
     <p class="eyebrow">For skincare brands on Shopify</p>
     <h1>Shoppers ask AI which serum to buy. Is it <em>recommending you?</em></h1>
-    <p class="lede">ChatGPT, Perplexity and Gemini are the new shop window. We check whether your brand shows up when buyers ask — and show you exactly how to get recommended.</p>
+    <p class="lede">Enter your website URL for a free initial analysis — we'll identify your likely category, the buying questions shoppers are asking, and your visibility risk.</p>
     <div class="hero-cta">
-      <form action="https://formspree.io/f/mojzkvgo" method="POST" data-form>
-        <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
-        <button type="submit">Get my free check</button>
-      </form>
-      <p class="ok" role="status">Thanks — your free visibility check is reserved. We'll email it to you.</p>
-      <p class="microcopy"><b>Free during early access.</b> We email your report. No card needed.</p>
+
+      <!-- Step 1: URL input -->
+      <div id="step-input" class="step active">
+        <div class="url-form">
+          <div class="url-row">
+            <input type="url" id="input-url" placeholder="yourstore.com" autocomplete="off" spellcheck="false">
+            <button id="btn-analyse" type="button">Analyse →</button>
+          </div>
+          <div class="optional-row">
+            <input type="text" id="input-brand" placeholder="Brand name (optional)">
+            <select id="input-market">
+              <option value="UK">🇬🇧 UK market</option>
+              <option value="US">🇺🇸 US market</option>
+              <option value="EU">🇪🇺 EU market</option>
+              <option value="AU">🇦🇺 AU market</option>
+              <option value="Global">🌍 Global</option>
+            </select>
+          </div>
+        </div>
+        <p class="microcopy" style="margin-top:10px"><b>Free initial analysis.</b> No account needed.</p>
+      </div>
+
+      <!-- Step 2: Loading -->
+      <div id="step-loading" class="step">
+        <div class="loading-wrap">
+          <p class="loading-label" id="loading-label">Fetching your website…</p>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+          <p class="microcopy" style="margin-top:4px">Reading public page content — this takes a few seconds.</p>
+        </div>
+      </div>
+
+      <!-- Step 3: Email capture (shown after results appear in right panel) -->
+      <div id="step-email" class="step">
+        <p style="font-family:'Newsreader',serif;font-size:1.15rem;margin-bottom:14px;line-height:1.3">Your initial analysis is ready. Enter your email to receive the <em>full visibility report.</em></p>
+        <form class="email-form" id="hero-form" action="https://formspree.io/f/mojzkvgo" method="POST" data-form>
+          <input type="hidden" name="website_url" id="h-url">
+          <input type="hidden" name="brand_name" id="h-brand">
+          <input type="hidden" name="market" id="h-market">
+          <input type="hidden" name="category" id="h-category">
+          <input type="hidden" name="summary" id="h-summary">
+          <input type="hidden" name="questions" id="h-questions">
+          <input type="hidden" name="timestamp" id="h-timestamp">
+          <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
+          <button type="submit">Get report</button>
+        </form>
+        <p class="ok" id="hero-ok" role="status">Thanks — your full visibility report is on its way.</p>
+        <p class="microcopy" style="margin-top:8px"><b>Free during early access.</b> No card needed.</p>
+      </div>
+
     </div>
   </div>
 
-  <!-- SIGNATURE: the AI answer your brand is missing from -->
-  <div class="answer-card" aria-label="Example AI shopping answer">
-    <div class="ac-top"><span></span><span></span><span></span><em class="lbl">AI shopping answer</em></div>
-    <div class="ac-body">
-      <div class="query">best vitamin C serum for sensitive, acne-prone skin under £40?</div>
-      <p class="ans-label">Here are three well-reviewed options:</p>
-      <div class="rec"><span class="num">1</span><span class="name">Luma Bright C+</span><span class="tag">15% L-AA · calming</span></div>
-      <div class="rec"><span class="num">2</span><span class="name">Aurelle Daily Glow</span><span class="tag">THD ascorbate</span></div>
-      <div class="rec"><span class="num">3</span><span class="name">Verde Clear Serum</span><span class="tag">niacinamide blend</span></div>
-      <div class="absent">
-        <span class="x">—</span>
-        <span class="t"><b>Your brand wasn't mentioned.</b><span>Across 30+ buying questions, the AI never put you on the list.</span></span>
+  <!-- Right panel: mock card initially, replaced by result after analysis -->
+  <div id="panel-right">
+
+    <!-- Static mock (shown before analysis) -->
+    <div id="panel-mock" class="answer-card" aria-label="Example AI shopping answer">
+      <div class="ac-top"><span></span><span></span><span></span><em class="lbl">AI shopping answer</em></div>
+      <div class="ac-body">
+        <div class="query">best vitamin C serum for sensitive, acne-prone skin under £40?</div>
+        <p class="ans-label">Here are three well-reviewed options:</p>
+        <div class="rec"><span class="num">1</span><span class="name">Luma Bright C+</span><span class="tag">15% L-AA · calming</span></div>
+        <div class="rec"><span class="num">2</span><span class="name">Aurelle Daily Glow</span><span class="tag">THD ascorbate</span></div>
+        <div class="rec"><span class="num">3</span><span class="name">Verde Clear Serum</span><span class="tag">niacinamide blend</span></div>
+        <div class="absent">
+          <span class="x">—</span>
+          <span class="t"><b>Your brand wasn't mentioned.</b><span>Across 30+ buying questions, the AI never put you on the list.</span></span>
+        </div>
       </div>
     </div>
+
+    <!-- Dynamic result (shown after analysis) -->
+    <div id="panel-result" style="display:none">
+      <div class="result-card">
+        <div class="ac-top"><span></span><span></span><span></span><em class="lbl" id="result-header">Initial analysis</em></div>
+        <div class="ac-body">
+          <span class="result-badge" id="result-category">—</span>
+          <p class="result-summary" id="result-summary"></p>
+          <p class="ans-label">Example AI shopping questions in your category</p>
+          <div class="result-questions" id="result-questions"></div>
+          <div class="result-narrative" id="result-narrative"></div>
+          <p class="result-fetch-warn" id="result-fetch-warn" style="display:none">⚠ Could not fetch your website directly — analysis based on URL signals only.</p>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -225,9 +342,9 @@
 <section class="wrap how">
   <h2>A plain-English check. <em>No dashboard to learn.</em></h2>
   <div class="steps">
-    <div class="step"><div class="n">Step 01</div><h3>Tell us your store</h3><p>Your URL and a few hero products. That's all we need to begin.</p></div>
-    <div class="step"><div class="n">Step 02</div><h3>We ask what your shoppers ask</h3><p>Dozens of real buying questions, run across ChatGPT, Perplexity and Gemini.</p></div>
-    <div class="step"><div class="n">Step 03</div><h3>You get the report</h3><p>Where you show up, who's beating you, and the fixes that actually move the needle.</p></div>
+    <div class="step-card"><div class="n">Step 01</div><h3>Enter your store URL</h3><p>We read your public website — title, description, headings — to identify your category and likely customers.</p></div>
+    <div class="step-card"><div class="n">Step 02</div><h3>See your initial analysis</h3><p>Example buying questions your category gets asked. A preview of where visibility gaps are likely. Based on public website signals.</p></div>
+    <div class="step-card"><div class="n">Step 03</div><h3>Get the full report</h3><p>Where you show up, who's beating you, and the fixes that actually move the needle. Emailed to you free.</p></div>
   </div>
 </section>
 
@@ -236,11 +353,12 @@
   <div class="close-card">
     <h2>See where you stand <em>before your competitors do.</em></h2>
     <p>We're running free visibility checks for a first group of skincare brands. Ongoing monitoring will be £29/mo at launch — early-access brands lock that in.</p>
-    <form action="https://formspree.io/f/mojzkvgo" method="POST" data-form>
+    <form class="email-form" id="close-form" action="https://formspree.io/f/mojzkvgo" method="POST" data-form>
+      <input type="hidden" name="source" value="close-section">
       <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email">
       <button type="submit">Reserve my free check</button>
     </form>
-    <p class="ok" role="status">Thanks — you're on the early-access list. Your report's on the way.</p>
+    <p class="ok" id="close-ok" role="status">Thanks — you're on the early-access list. Your report's on the way.</p>
     <p class="microcopy"><b>Limited first group.</b> Free check + locked-in £29/mo if you continue.</p>
   </div>
 </section>
@@ -253,23 +371,149 @@
 </footer>
 
 <script>
-  // Smoke-test form handling.
-  // If FORM_ENDPOINT is set to a real endpoint (Formspree/Getform/etc.), the email POSTs there.
-  // Either way the visitor sees a success state so the page feels complete during testing.
-  document.querySelectorAll('[data-form]').forEach(function(f){
-    f.addEventListener('submit', function(e){
-      var endpoint = f.getAttribute('action');
+(function () {
+  // ── Shared email form handler (close section) ─────────────────────────────
+  document.querySelectorAll('[data-form]').forEach(function (f) {
+    f.addEventListener('submit', function (e) {
       var ok = f.parentElement.querySelector('.ok');
-      var emailField = f.querySelector('input[type=email]');
-      if(!emailField.checkValidity()){ return; }   // let native validation show
+      if (f.id === 'hero-form') return; // handled separately below
       e.preventDefault();
-      if(endpoint && endpoint !== 'FORM_ENDPOINT'){
-        fetch(endpoint, {method:'POST', body:new FormData(f), headers:{'Accept':'application/json'}}).catch(function(){});
-      }
+      var endpoint = f.getAttribute('action');
+      if (endpoint) fetch(endpoint, { method: 'POST', body: new FormData(f), headers: { Accept: 'application/json' } }).catch(function () {});
       f.classList.add('done');
-      if(ok) ok.classList.add('show');
+      if (ok) ok.classList.add('show');
     });
   });
+
+  // ── Hero form submit ───────────────────────────────────────────────────────
+  document.getElementById('hero-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = this;
+    var endpoint = f.getAttribute('action');
+    if (endpoint) fetch(endpoint, { method: 'POST', body: new FormData(f), headers: { Accept: 'application/json' } }).catch(function () {});
+    f.classList.add('done');
+    document.getElementById('hero-ok').classList.add('show');
+  });
+
+  // ── Analysis flow ──────────────────────────────────────────────────────────
+  function showStep(id) {
+    ['step-input', 'step-loading', 'step-email'].forEach(function (s) {
+      document.getElementById(s).classList.toggle('active', s === id);
+    });
+  }
+
+  function setProgress(pct, label) {
+    document.getElementById('progress-fill').style.width = pct + '%';
+    if (label) document.getElementById('loading-label').textContent = label;
+  }
+
+  function capLabel(text, max) {
+    return text && text.length > max ? text.slice(0, max - 1) + '…' : text;
+  }
+
+  function renderResult(data, inputUrl, brandName, market) {
+    var name = brandName || data.title || inputUrl;
+
+    document.getElementById('result-header').textContent = capLabel(name, 40) + ' — initial analysis';
+    document.getElementById('result-category').textContent = '📂 ' + (data.category || 'beauty');
+
+    var summary = data.summary || 'Analysis based on public website signals.';
+    document.getElementById('result-summary').textContent = capLabel(summary, 180);
+
+    var qEl = document.getElementById('result-questions');
+    qEl.innerHTML = '';
+    (data.questions || []).forEach(function (q) {
+      var d = document.createElement('div');
+      d.className = 'result-q';
+      d.textContent = q;
+      qEl.appendChild(d);
+    });
+
+    document.getElementById('result-narrative').textContent = data.riskNarrative || '';
+
+    if (!data.fetchedOk) {
+      document.getElementById('result-fetch-warn').style.display = 'block';
+    }
+
+    // Populate hidden Formspree fields
+    document.getElementById('h-url').value = inputUrl;
+    document.getElementById('h-brand').value = brandName;
+    document.getElementById('h-market').value = market;
+    document.getElementById('h-category').value = data.category || '';
+    document.getElementById('h-summary').value = capLabel(summary, 300);
+    document.getElementById('h-questions').value = (data.questions || []).join(' | ');
+    document.getElementById('h-timestamp').value = new Date().toISOString();
+
+    // Swap panels
+    document.getElementById('panel-mock').style.display = 'none';
+    document.getElementById('panel-result').style.display = 'block';
+    showStep('step-email');
+  }
+
+  function renderFallback(inputUrl, brandName, market) {
+    // No fetch, no API — show a generic but honest result
+    renderResult({
+      fetchedOk: false,
+      category: 'beauty',
+      summary: 'We were unable to read your website directly. The full report will include a manual check of your public pages.',
+      questions: [
+        'best moisturiser for dry skin',
+        'best cruelty-free serum',
+        'best vitamin C serum for sensitive skin',
+        'best skincare routine for beginners',
+      ],
+      riskNarrative: 'When shoppers ask AI tools for beauty recommendations, they typically receive 3–5 brand names. Your full report will show which questions your brand appears in, and which competitors are named instead.',
+    }, inputUrl, brandName, market);
+  }
+
+  document.getElementById('btn-analyse').addEventListener('click', async function () {
+    var rawUrl = document.getElementById('input-url').value.trim();
+    var brandName = document.getElementById('input-brand').value.trim();
+    var market = document.getElementById('input-market').value;
+
+    if (!rawUrl) {
+      document.getElementById('input-url').focus();
+      return;
+    }
+
+    showStep('step-loading');
+    setProgress(15, 'Fetching your website…');
+
+    var progressTimer = setInterval(function () {
+      var fill = document.getElementById('progress-fill');
+      var cur = parseFloat(fill.style.width) || 15;
+      if (cur < 75) {
+        fill.style.width = (cur + 8) + '%';
+        if (cur > 30) document.getElementById('loading-label').textContent = 'Analysing page content…';
+        if (cur > 55) document.getElementById('loading-label').textContent = 'Identifying category and questions…';
+      }
+    }, 600);
+
+    try {
+      var res = await fetch('/api/analyse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: rawUrl, brandName: brandName, market: market }),
+      });
+
+      clearInterval(progressTimer);
+      setProgress(100, 'Done.');
+
+      if (!res.ok) throw new Error('API error');
+      var data = await res.json();
+
+      setTimeout(function () { renderResult(data, rawUrl, brandName, market); }, 300);
+    } catch (err) {
+      clearInterval(progressTimer);
+      setTimeout(function () { renderFallback(rawUrl, brandName, market); }, 300);
+    }
+  });
+
+  // Allow Enter key in URL field
+  document.getElementById('input-url').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('btn-analyse').click();
+  });
+})();
 </script>
 
 <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "4f58da1f528f4f458bbe9e8925c0e7f6"}'></script><!-- End Cloudflare Web Analytics -->
