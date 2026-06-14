@@ -1,8 +1,8 @@
-const https = require('https');
+﻿const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 
-// ── Blocked/error page detection ─────────────────────────────────────────────
+// â”€â”€ Blocked/error page detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const BLOCKED_SIGNALS = [
   'access denied', 'forbidden', '403 forbidden', 'request blocked',
   'bot protection', 'just a moment', 'checking your browser',
@@ -26,7 +26,7 @@ function isBlockedPage(extracted) {
   return false;
 }
 
-// ── Known-domain overrides ────────────────────────────────────────────────────
+// â”€â”€ Known-domain overrides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DOMAIN_OVERRIDES = {
   'sainsburys.co.uk': {
     primary: 'grocery',
@@ -56,7 +56,7 @@ const DOMAIN_OVERRIDES = {
   'next.co.uk': {
     primary: 'fashion',
     categories: ['fashion', 'homeware', 'baby-kids', 'general-retail'],
-    summary: 'Next is a UK fashion, homeware, kidswear and general retail brand — one of the UK\'s largest retailers selling clothing, footwear, accessories, furniture and home goods online and in-store.',
+    summary: 'Next is a UK fashion, homeware, kidswear and general retail brand â€” one of the UK\'s largest retailers selling clothing, footwear, accessories, furniture and home goods online and in-store.',
   },
   'theordinary.com': {
     primary: 'beauty',
@@ -80,7 +80,7 @@ const DOMAIN_OVERRIDES = {
   },
 };
 
-// ── Category definitions with weighted keywords ────────────────────────────────
+// â”€â”€ Category definitions with weighted keywords â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CATEGORY_DEFS = {
   grocery: {
     label: 'Grocery & supermarket',
@@ -116,9 +116,9 @@ const CATEGORY_DEFS = {
     ],
   },
   homeware: {
-    label: 'Homeware & décor',
+    label: 'Homeware & dÃ©cor',
     keywords: [
-      'homeware', 'home decor', 'home décor', 'furniture', 'sofa', 'bed', 'bedding',
+      'homeware', 'home decor', 'home dÃ©cor', 'furniture', 'sofa', 'bed', 'bedding',
       'duvet', 'cushion', 'curtains', 'rug', 'lamp', 'lighting', 'dining', 'kitchen',
       'cookware', 'tableware', 'storage', 'shelving', 'interior', 'living room', 'bedroom',
       'bathroom', 'garden furniture', 'candle', 'wall art', 'picture frame', 'mirror',
@@ -215,7 +215,7 @@ const CATEGORY_DEFS = {
   },
 };
 
-// Reverse map: Gemini label → internal key
+// Reverse map: Gemini label â†’ internal key
 const LABEL_TO_KEY = {};
 for (const [key, def] of Object.entries(CATEGORY_DEFS)) {
   LABEL_TO_KEY[def.label.toLowerCase()] = key;
@@ -224,7 +224,7 @@ for (const [key, def] of Object.entries(CATEGORY_DEFS)) {
 const LABEL_ALIASES = {
   'fashion & apparel': 'fashion',
   'beauty & skincare': 'beauty',
-  'homeware & décor': 'homeware',
+  'homeware & dÃ©cor': 'homeware',
   'homeware & decor': 'homeware',
   'food & drink': 'food',
   'grocery & supermarket': 'grocery',
@@ -248,7 +248,7 @@ function labelToKey(label) {
   return LABEL_TO_KEY[lower] || LABEL_ALIASES[lower] || null;
 }
 
-// ── Question templates per category ───────────────────────────────────────────
+// â”€â”€ Question templates per category â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const QUESTIONS = {
   grocery: [
     'best online grocery delivery in the UK',
@@ -259,18 +259,18 @@ const QUESTIONS = {
   ],
   fashion: [
     'best affordable women\'s jeans UK 2025',
-    'best men\'s winter coat under £100',
+    'best men\'s winter coat under Â£100',
     'best running trainers for beginners UK',
     'best sustainable fashion brands UK',
   ],
   beauty: [
     'best vitamin C serum for sensitive skin',
-    'best moisturiser for dry skin under £30',
+    'best moisturiser for dry skin under Â£30',
     'best cruelty-free retinol serum UK',
     'best SPF moisturiser for daily use',
   ],
   homeware: [
-    'best affordable sofa UK under £600',
+    'best affordable sofa UK under Â£600',
     'best Egyptian cotton bedding set',
     'best coffee maker for home use UK',
     'best scented candle for living rooms',
@@ -297,7 +297,7 @@ const QUESTIONS = {
     'best yoga mat for beginners UK',
     'best resistance bands set UK',
     'best running shoes for flat feet',
-    'best home gym equipment under £200',
+    'best home gym equipment under Â£200',
   ],
   'baby-kids': [
     'best lightweight pushchair 2025 UK',
@@ -306,10 +306,10 @@ const QUESTIONS = {
     'best convertible car seat UK',
   ],
   electronics: [
-    'best wireless earbuds under £100 UK',
+    'best wireless earbuds under Â£100 UK',
     'best laptop for students UK 2025',
     'best portable charger UK',
-    'best smartwatch under £200',
+    'best smartwatch under Â£200',
   ],
   'professional-services': [
     'best small business accountants UK',
@@ -337,12 +337,12 @@ const QUESTIONS = {
   ],
 };
 
-// ── Customer type labels ───────────────────────────────────────────────────────
+// â”€â”€ Customer type labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CUSTOMER_TYPES = {
   grocery:                 'shoppers researching grocery delivery, supermarket options and food value',
   fashion:                'shoppers researching clothing, footwear and accessories',
   beauty:                  'beauty shoppers researching ingredients and product results',
-  homeware:                'home shoppers looking for furniture, bedding and décor',
+  homeware:                'home shoppers looking for furniture, bedding and dÃ©cor',
   food:                    'food lovers exploring artisan and specialty products',
   supplements:             'health-conscious consumers comparing supplements and nutrition',
   pets:                    'pet owners researching food, accessories and health products',
@@ -355,7 +355,7 @@ const CUSTOMER_TYPES = {
   other:                   'online shoppers researching and comparing products',
 };
 
-// ── HTTP fetch ────────────────────────────────────────────────────────────────
+// â”€â”€ HTTP fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function fetchHtml(rawUrl, timeout = 9000, redirectsLeft = 3) {
   return new Promise((resolve, reject) => {
     let parsed;
@@ -388,7 +388,7 @@ function fetchHtml(rawUrl, timeout = 9000, redirectsLeft = 3) {
   });
 }
 
-// ── HTML extraction ───────────────────────────────────────────────────────────
+// â”€â”€ HTML extraction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function extract(html) {
   const titleM = html.match(/<title[^>]*>([^<]{1,300})<\/title>/i);
   const title = titleM ? titleM[1].replace(/\s+/g, ' ').trim() : '';
@@ -434,7 +434,7 @@ function extract(html) {
   return { title, metaDesc, ogTitle, ogDesc, headings, navLinks, bodyText };
 }
 
-// ── Category detection (rules-based fallback) ─────────────────────────────────
+// â”€â”€ Category detection (rules-based fallback) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function detectCategories(extracted) {
   const { title, metaDesc, ogTitle, ogDesc, headings, navLinks, bodyText } = extracted;
   const corpus = [
@@ -471,8 +471,8 @@ function detectCategories(extracted) {
   return { primary, categories };
 }
 
-// ── Gemini AI classification ───────────────────────────────────────────────────
-function postJson(url, payload, timeout = 12000) {
+// â”€â”€ AI classification helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function postJson(url, payload, timeout = 12000, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     let parsed;
     try { parsed = new URL(url); } catch { return reject(new Error('Invalid URL')); }
@@ -484,6 +484,7 @@ function postJson(url, payload, timeout = 12000) {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
+        ...extraHeaders,
       },
     }, (res) => {
       let data = '';
@@ -501,10 +502,7 @@ function postJson(url, payload, timeout = 12000) {
   });
 }
 
-async function callGemini(extracted, targetUrl, analysisStatus) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-
+function buildAiPrompt(extracted, targetUrl, analysisStatus) {
   const { title, metaDesc, ogTitle, ogDesc, headings, navLinks, bodyText } = extracted;
   const isBlocked = analysisStatus === 'blocked' || analysisStatus === 'failed';
 
@@ -521,7 +519,7 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
       bodyText    ? `Body text snippet: ${bodyText.slice(0, 800)}` : '',
     ].filter(Boolean).join('\n');
 
-  const prompt = `Analyse the website signals below. Return ONLY a valid JSON object — no markdown, no fences. Keep all string values under 20 words. Arrays max 5 items.
+  return `Analyse the website signals below. Return ONLY a valid JSON object â€” no markdown, no fences. Keep all string values under 20 words. Arrays max 5 items.
 
 {
   "organisation_name": "trading name only",
@@ -529,36 +527,41 @@ async function callGemini(extracted, targetUrl, analysisStatus) {
   "business_summary": "2-3 sentences in your own words",
   "primary_category": "one exact value from the category list",
   "secondary_categories": [],
-  "detected_niche": "specific sub-type e.g. Cornish cask ale brewery — empty if none",
+  "detected_niche": "specific sub-type e.g. Cornish cask ale brewery â€” empty if none",
   "products_or_services_found": [{"category": "label", "examples": ["product 1", "product 2"]}],
   "customer_channels": [{"channel": "e.g. Direct ecommerce / Pub supply", "reason": "one sentence"}],
   "public_signals": ["award", "heritage", "location", "years trading"],
-  "market_or_location_signals": "e.g. Cornwall UK — empty if none",
-  "allowed_topics": ["topics from products/channels/signals only — questions must use ONLY these"],
+  "market_or_location_signals": "e.g. Cornwall UK â€” empty if none",
+  "allowed_topics": ["topics from products/channels/signals only â€” questions must use ONLY these"],
   "likely_search_intents": ["5 real customer needs: who is searching and why, e.g. 'dad buying a beer gift', 'bar manager finding local stock', 'couple planning a day out'"],
   "example_ai_shopping_questions": [
-    {"question": "natural sentence as typed to ChatGPT — casual plain English, real-life detail, starts with find me/I'm looking for/can you recommend/where can I get/what's a good/I need", "search_intent": "who is searching and why", "evidence_term": "single key term from allowed_topics"}
+    {"question": "natural sentence as typed to ChatGPT â€” casual plain English, real-life detail, starts with find me/I'm looking for/can you recommend/where can I get/what's a good/I need", "search_intent": "who is searching and why", "evidence_term": "single key term from allowed_topics"}
   ],
   "visibility_gaps": ["missing info a buyer would want"],
   "confidence_score": 0.85
 }
 
 RULES:
-1. Classify from evidence. Brewery → "Food & drink". Skincare → "Beauty & skincare".
+1. Classify from evidence. Brewery â†’ "Food & drink". Skincare â†’ "Beauty & skincare".
 2. allowed_topics: ONLY topics found in the signals. Nothing invented.
-3. Questions must sound like a real person talking to ChatGPT — casual, plain English, not marketing copy. FORBIDDEN WORDS: award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, bespoke, curated, hospitality supplier. Also forbidden: business name, brand name, "you", "your".
-   GOOD: "I'm looking for a local brewery in Cornwall that sells to pubs — any recommendations?" / "where can I get Cornish beer delivered?" / "what's a good brewery near Truro to visit for a day out?"
+3. Questions must sound like a real person talking to ChatGPT â€” casual, plain English, not marketing copy. FORBIDDEN WORDS: award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, bespoke, curated, hospitality supplier. Also forbidden: business name, brand name, "you", "your".
+   GOOD: "I'm looking for a local brewery in Cornwall that sells to pubs â€” any recommendations?" / "where can I get Cornish beer delivered?" / "what's a good brewery near Truro to visit for a day out?"
    BAD: "find me award-winning cask ales" / "recommend an independent brewery that supplies pubs wholesale"
 4. Each question must use a term from allowed_topics. evidence_term must be in allowed_topics. Omit rather than invent.
 5. Do NOT write questions about categories not in products_or_services_found.
 6. confidence_score: 0.6-0.75 if website blocked.
 
-Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
+Categories: Fashion & apparel | Beauty & skincare | Homeware & dÃ©cor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
 
 Website signals:
 ${signalsBlock}`;
+}
 
-  // flash-lite = 30 RPM (vs flash 15 RPM) — use as primary to halve rate-limit exposure
+async function callGemini(prompt) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  // flash-lite = 30 RPM (vs flash 15 RPM) â€” use as primary to halve rate-limit exposure
   const MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash'];
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -601,7 +604,64 @@ ${signalsBlock}`;
   }
 }
 
-// ── Niche question templates ───────────────────────────────────────────────────
+// â”€â”€ Groq fallback (free tier: 14,400 RPD â€” 10Ã— Gemini free tier) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function callGroq(prompt) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  const payload = {
+    model: 'llama-3.1-8b-instant',
+    messages: [
+      { role: 'system', content: 'You are a business analyst. Return only valid JSON â€” no markdown, no code fences.' },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.2,
+    max_tokens: 3000,
+    response_format: { type: 'json_object' },
+  };
+
+  try {
+    const result = await postJson(
+      'https://api.groq.com/openai/v1/chat/completions',
+      payload,
+      25000,
+      { Authorization: `Bearer ${apiKey}` },
+    );
+    if (result.status !== 200) {
+      console.error('Groq error', result.status, JSON.stringify(result.body).slice(0, 200));
+      return { _error: `groq_status_${result.status}` };
+    }
+    const text = result.body?.choices?.[0]?.message?.content || '';
+    const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (!parsed.primary_category || !parsed.example_ai_shopping_questions) {
+      return { _error: 'groq_missing_fields' };
+    }
+    console.log('Groq fallback succeeded');
+    return parsed;
+  } catch (err) {
+    console.error('Groq call failed:', err.message);
+    return { _error: err.message || 'groq_unknown' };
+  }
+}
+
+// â”€â”€ AI orchestrator: Gemini â†’ Groq fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function callAI(extracted, targetUrl, analysisStatus) {
+  const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus);
+
+  // Try Gemini first
+  const geminiResult = await callGemini(prompt);
+  if (geminiResult && !geminiResult._error) return geminiResult;
+
+  // Fall back to Groq if Gemini key missing or rate-limited
+  const groqResult = await callGroq(prompt);
+  if (groqResult && !groqResult._error) return groqResult;
+
+  // Both failed â€” return the Gemini error (or Groq error if no Gemini key)
+  return geminiResult || groqResult || { _error: 'no_ai_provider' };
+}
+
+// â”€â”€ Niche question templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NICHE_QUESTIONS = {
   'speciality coffee': [
     'best speciality coffee roasters in the UK',
@@ -689,7 +749,7 @@ const NICHE_QUESTIONS = {
   ],
 };
 
-// Exclusive terms per category — words that signal a question belongs to THAT category only.
+// Exclusive terms per category â€” words that signal a question belongs to THAT category only.
 // Used to detect cross-category contamination in AI-generated questions.
 const EXCLUSIVE_TERMS = {
   fashion:              ['jeans', 'coat', 'dress', 'jacket', 'trainers', 'boots', 'handbag', 'lingerie', 'swimwear', 'womenswear', 'menswear', 'denim', 'blazer', 'skirt'],
@@ -716,7 +776,7 @@ function questionMismatch(questionLower, primaryKey) {
   return false;
 }
 
-// ── Map Gemini result to our internal schema ───────────────────────────────────
+// â”€â”€ Map Gemini result to our internal schema â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function applyGeminiResult(gemini, brandNameInput) {
   const primaryKey = labelToKey(gemini.primary_category) || 'other';
   const secondaryKeys = (gemini.secondary_categories || [])
@@ -779,7 +839,7 @@ function applyGeminiResult(gemini, brandNameInput) {
   }).filter(Boolean).filter(q => q.question.length > 5).slice(0, 5);
 
   // Build a supported-terms set from everything Gemini extracted about this business.
-  // Questions must use terms from this set — not generic category language.
+  // Questions must use terms from this set â€” not generic category language.
   const STOP_WORDS = new Set(['best','most','good','great','find','where','what','which','does','have','with','from','that','this','your','their','some','will','more','very','into','just','also','only','when','then','than','them','they','been','were','make','made','such','each','much','many','both','even','well','over','here','how','for','can','the','and','are','has','its','was','not','but','our','all','any','get','per','via','new']);
   const evidenceTerms = new Set();
 
@@ -853,7 +913,7 @@ function applyGeminiResult(gemini, brandNameInput) {
   const validQs = normalisedQs.filter(questionSupported);
 
   // Never pad AI-assisted questions with preloaded or generic templates.
-  // If Gemini didn't generate enough supported questions, say so — don't invent.
+  // If Gemini didn't generate enough supported questions, say so â€” don't invent.
   let weakEvidence = false;
   const finalQs = [...validQs];
   if (finalQs.length < 3) weakEvidence = true;
@@ -876,12 +936,12 @@ function applyGeminiResult(gemini, brandNameInput) {
   };
 }
 
-// ── Summary / narrative builders ──────────────────────────────────────────────
+// â”€â”€ Summary / narrative builders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildSummary(extracted, brandName) {
   const { title, metaDesc, ogDesc, headings } = extracted;
   const best = ogDesc || metaDesc;
   if (best && best.length > 40) return best.slice(0, 240);
-  if (headings.length > 0) return (title ? title + ' — ' : '') + headings[0];
+  if (headings.length > 0) return (title ? title + ' â€” ' : '') + headings[0];
   return title || `Initial analysis based on public website signals${brandName ? ' for ' + brandName : ''}.`;
 }
 
@@ -890,7 +950,7 @@ function buildRiskNarrative(brandName, primary, categories) {
   const catLabel = CATEGORY_DEFS[primary]?.label || primary;
   const others = categories.filter(c => c !== primary).map(c => CATEGORY_DEFS[c]?.label || c);
   const multi = others.length > 0 ? ` (and ${others.join(', ')})` : '';
-  return `When shoppers ask AI assistants for ${catLabel}${multi} recommendations, they typically receive 3–5 brand names. Based on ${name}'s public website signals, we've identified the question types where visibility gaps are most likely. The full report shows which queries are relevant to your brand and which competitors are appearing instead.`;
+  return `When shoppers ask AI assistants for ${catLabel}${multi} recommendations, they typically receive 3â€“5 brand names. Based on ${name}'s public website signals, we've identified the question types where visibility gaps are most likely. The full report shows which queries are relevant to your brand and which competitors are appearing instead.`;
 }
 
 function buildQuestions(categories) {
@@ -905,7 +965,7 @@ function buildQuestions(categories) {
   return out;
 }
 
-// ── Domain override matcher ───────────────────────────────────────────────────
+// â”€â”€ Domain override matcher â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function matchDomainOverride(rawUrl) {
   try {
     const hostname = new URL(rawUrl.startsWith('http') ? rawUrl : 'https://' + rawUrl)
@@ -923,7 +983,7 @@ function readBody(req) {
   });
 }
 
-// ── In-memory result cache ─────────────────────────────────────────────────────
+// â”€â”€ In-memory result cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Persists across warm invocations of the same serverless instance.
 // Prevents repeated Gemini calls for the same URL within a warm window.
 const RESULT_CACHE = new Map();
@@ -943,7 +1003,7 @@ function cacheSet(key, data) {
   RESULT_CACHE.set(key, { data, ts: Date.now() });
 }
 
-// ── Handler ───────────────────────────────────────────────────────────────────
+// â”€â”€ Handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -1010,15 +1070,15 @@ module.exports = async (req, res) => {
     if (override.summary) extracted.metaDesc = override.summary;
   }
 
-  // Domain override always wins — even if scraping was blocked
+  // Domain override always wins â€” even if scraping was blocked
   if (override) {
     analysisStatus = 'ok';
     fetchedOk = true;
   }
 
-  // No override and blocked/failed → try Gemini with domain-only signal, else ask user
+  // No override and blocked/failed â†’ try Gemini with domain-only signal, else ask user
   if (!override && (analysisStatus === 'blocked' || analysisStatus === 'failed')) {
-    const geminiRaw = await callGemini(extracted, targetUrl, analysisStatus);
+    const geminiRaw = await callAI(extracted, targetUrl, analysisStatus);
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName);
@@ -1039,7 +1099,7 @@ module.exports = async (req, res) => {
         confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes,
       });
     }
-    // No Gemini key or Gemini failed — ask user to pick category manually
+    // No Gemini key or Gemini failed â€” ask user to pick category manually
     return res.status(200).json({
       fetchedOk: false,
       needsManualCategory: true,
@@ -1056,7 +1116,7 @@ module.exports = async (req, res) => {
     });
   }
 
-  // ── Classify: try Gemini first, fall back to rules-based ─────────────────────
+  // â”€â”€ Classify: try Gemini first, fall back to rules-based â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let primary, categories, summary, questions, questionsRich = [], customerType, aiAssisted = false;
   let aiExtras = {}, weakEvidence = false;
   let detectedNiche = null, productsFound = [], productsStructured = [];
@@ -1065,7 +1125,7 @@ module.exports = async (req, res) => {
 
   if (override) {
     ({ primary, categories } = override);
-    const geminiRaw = await callGemini(extracted, targetUrl, 'ok');
+    const geminiRaw = await callAI(extracted, targetUrl, 'ok');
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
@@ -1084,7 +1144,7 @@ module.exports = async (req, res) => {
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
       if (geminiRaw?._error) {
         aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '' };
-        // Gemini key present but call failed — don't show generic category questions
+        // Gemini key present but call failed â€” don't show generic category questions
         // that are unrelated to this business. Show weak-evidence warning instead.
         questions = []; questionsRich = []; weakEvidence = true;
       } else {
@@ -1092,7 +1152,7 @@ module.exports = async (req, res) => {
       }
     }
   } else {
-    const geminiRaw = await callGemini(extracted, targetUrl, analysisStatus);
+    const geminiRaw = await callAI(extracted, targetUrl, analysisStatus);
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
@@ -1113,7 +1173,7 @@ module.exports = async (req, res) => {
       customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
       if (geminiRaw?._error) {
         aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '' };
-        // Gemini key present but call failed — don't show generic category questions
+        // Gemini key present but call failed â€” don't show generic category questions
         // that are unrelated to this business. Show weak-evidence warning instead.
         questions = []; questionsRich = []; weakEvidence = true;
       } else {
