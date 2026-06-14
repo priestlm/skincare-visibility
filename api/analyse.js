@@ -642,18 +642,25 @@ function callGroq(prompt) {
   return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', apiKey, prompt, 'Groq');
 }
 
-// OpenRouter — works from Vercel, free tier, no credit card required
+// OpenRouter — works from Vercel, free tier (200 RPD), no credit card required
 async function callOpenRouter(prompt) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) return null;
   const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-  // Try two free models in sequence
-  const models = ['google/gemma-2-9b-it:free', 'meta-llama/llama-3.1-8b-instruct:free'];
+  // Current free models (June 2026) — try in order
+  const models = [
+    'deepseek/deepseek-r1:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'mistralai/mistral-7b-instruct:free',
+  ];
   let lastErr;
   for (const model of models) {
     const result = await callOpenAICompat(endpoint, model, apiKey, prompt, `OpenRouter(${model})`);
     if (result && !result._error) return result;
     lastErr = result;
+    const errStr = result?._error || '';
+    // Only continue to next model on 404 or 429; stop on auth/server errors
+    if (!errStr.includes('404') && !errStr.includes('429')) break;
   }
   return lastErr || { _error: 'openrouter_all_failed' };
 }
