@@ -1223,15 +1223,14 @@ module.exports = async (req, res) => {
       aiAssisted = true;
       aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
     } else {
-      summary = buildSummary(extracted, brandName || extracted.title);
-      customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
-      const kwNiche = detectNicheFromText(extracted);
-      if (geminiRaw?._error) {
-        aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '', rateLimitFallback: true };
-        questions = buildQuestions(categories, kwNiche); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
-      } else {
-        questions = buildQuestions(categories, kwNiche); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
-      }
+      // AI failed for domain override — cannot generate brand-specific questions
+      return res.status(200).json({
+        fetchedOk: false, needsManualCategory: true, aiAssisted: false,
+        geminiKeyPresent: !!process.env.GEMINI_API_KEY,
+        geminiError: geminiRaw?._error || 'ai_failed',
+        analysis_status: 'failed',
+        title: brandName || targetUrl, summary: '', categories: [], primary: null, questions: [], riskNarrative: '',
+      });
     }
   } else {
     const geminiRaw = await callAI(extracted, targetUrl, analysisStatus);
@@ -1250,16 +1249,14 @@ module.exports = async (req, res) => {
       aiAssisted = true;
       aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
     } else {
-      ({ primary, categories } = detectCategories(extracted));
-      summary = buildSummary(extracted, brandName || extracted.title);
-      customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
-      const kwNiche = detectNicheFromText(extracted);
-      if (geminiRaw?._error) {
-        aiExtras = { geminiError: geminiRaw._error, geminiErrorDetail: geminiRaw._errorDetail || '', rateLimitFallback: true };
-        questions = buildQuestions(categories, kwNiche); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
-      } else {
-        questions = buildQuestions(categories, kwNiche); questionsRich = questions.map(q => ({ question: q, search_intent: '' }));
-      }
+      // AI failed — cannot generate brand-specific questions, return error rather than generic templates
+      return res.status(200).json({
+        fetchedOk, needsManualCategory: true, aiAssisted: false,
+        geminiKeyPresent: !!process.env.GEMINI_API_KEY,
+        geminiError: geminiRaw?._error || 'ai_failed',
+        analysis_status: analysisStatus,
+        title: brandName || extracted.title || targetUrl, summary: '', categories: [], primary: null, questions: [], riskNarrative: '',
+      });
     }
   }
 

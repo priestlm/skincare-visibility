@@ -642,6 +642,15 @@ async function generateReport() {
     clearInterval(analyseTicker);
     if (!ar.ok) throw new Error('Analysis failed (' + ar.status + ')');
     const analysis = await ar.json();
+
+    if (analysis.needsManualCategory) {
+      clearInterval(analyseTicker);
+      setStep('analyse', 'err', 'AI analysis failed — could not generate brand-specific questions');
+      setStage('empty');
+      alert('Could not analyse this website.\n\nThe AI was unable to identify the brand\'s products and generate relevant questions. This usually happens when:\n• The website blocks automated access\n• The AI providers are rate-limited\n\nPlease try again in a minute, or check that the URL is correct.');
+      return;
+    }
+
     setStep('analyse', 'done', 'Category: ' + (analysis.primary || 'unknown'));
 
     const orgName = analysis.organisationName || analysis.title || brand || url;
