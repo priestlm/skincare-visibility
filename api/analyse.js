@@ -356,6 +356,36 @@ const CUSTOMER_TYPES = {
 };
 
 // â”€â”€ HTTP fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+async function fetchDuckDuckGo(query) {
+  try {
+    const q = encodeURIComponent(query);
+    const url = `https://api.duckduckgo.com/?q=${q}&format=json&no_redirect=1&no_html=1&skip_disambig=1`;
+    const data = await new Promise((resolve, reject) => {
+      https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res) => {
+        let raw = '';
+        res.setEncoding('utf8');
+        res.on('data', c => { raw += c; });
+        res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve(null); } });
+      }).setTimeout(6000, function() { this.destroy(); reject(new Error('timeout')); })
+        .on('error', reject);
+    });
+    if (!data) return null;
+    const abstract = (data.AbstractText || '').trim();
+    const topics = (data.RelatedTopics || [])
+      .filter(t => t.Text && !t.Topics)
+      .slice(0, 6)
+      .map(t => t.Text);
+    const infobox = (data.Infobox?.content || [])
+      .filter(i => i.label && i.value)
+      .slice(0, 8)
+      .map(i => `${i.label}: ${i.value}`);
+    if (!abstract && !topics.length && !infobox.length) return null;
+    return { abstract, topics, infobox, entity: data.Entity || '', heading: data.Heading || '' };
+  } catch {
+    return null;
+  }
+}
+
 function fetchHtml(rawUrl, timeout = 9000, redirectsLeft = 3) {
   return new Promise((resolve, reject) => {
     let parsed;
@@ -502,12 +532,20 @@ function postJson(url, payload, timeout = 12000, extraHeaders = {}) {
   });
 }
 
-function buildAiPrompt(extracted, targetUrl, analysisStatus) {
+function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal) {
   const { title, metaDesc, ogTitle, ogDesc, headings, navLinks, bodyText } = extracted;
   const isBlocked = analysisStatus === 'blocked' || analysisStatus === 'failed';
 
-  const signalsBlock = isBlocked
-    ? `Note: The website blocked automated access. Use your training knowledge of this brand to answer.\nURL: ${targetUrl}\nInfer category, products, and questions from the brand name and domain alone. Still generate AT LEAST 20 questions.`
+  const ddgBlock = ddgSignal ? [
+    ddgSignal.heading ? `Brand: ${ddgSignal.heading}` : '',
+    ddgSignal.entity  ? `Entity type: ${ddgSignal.entity}` : '',
+    ddgSignal.abstract ? `DuckDuckGo summary: ${ddgSignal.abstract}` : '',
+    ddgSignal.infobox.length ? `Key facts: ${ddgSignal.infobox.join(' | ')}` : '',
+    ddgSignal.topics.length  ? `Related topics: ${ddgSignal.topics.slice(0, 4).join(' | ')}` : '',
+  ].filter(Boolean).join('\n') : '';
+
+  const siteBlock = isBlocked
+    ? `Note: Website blocked automated access — use DuckDuckGo data above as primary signal.\nURL: ${targetUrl}`
     : [
       `URL: ${targetUrl}`,
       title       ? `Page title: ${title}` : '',
@@ -518,6 +556,8 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus) {
       navLinks.length ? `Navigation links: ${navLinks.slice(0, 20).join(', ')}` : '',
       bodyText    ? `Body text snippet: ${bodyText.slice(0, 800)}` : '',
     ].filter(Boolean).join('\n');
+
+  const signalsBlock = [ddgBlock, siteBlock].filter(Boolean).join('\n\n');
 
   return `Analyse the website signals below. Return ONLY a valid JSON object — no markdown, no fences. Keep all string values under 25 words.
 
@@ -682,8 +722,8 @@ async function callOpenRouter(prompt) {
 }
 
 // â”€â”€ AI orchestrator: Gemini â†' Groq â†' OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function callAI(extracted, targetUrl, analysisStatus) {
-  const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus);
+async function callAI(extracted, targetUrl, analysisStatus, ddgSignal) {
+  const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal);
 
   // Groq first — typically <2s response, generous rate limits
   const groqResult = await callGroq(prompt);
@@ -1134,10 +1174,21 @@ module.exports = async (req, res) => {
   let extracted = { title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' };
   let fetchedOk = false;
   let analysisStatus = 'ok'; // ok | blocked | failed
+  let ddgSignal = null;
+
+  // Always query DuckDuckGo — runs in parallel with site scrape
+  const ddgQuery = (brandName || '') + (brandName ? ' brand products UK' : new URL(targetUrl).hostname.replace(/^www\./, '') + ' brand UK');
+  const [ddgResult, htmlResult] = await Promise.allSettled([
+    fetchDuckDuckGo(ddgQuery),
+    override ? Promise.resolve(null) : fetchHtml(targetUrl),
+  ]);
+
+  ddgSignal = ddgResult.status === 'fulfilled' ? ddgResult.value : null;
 
   if (!override) {
     try {
-      const html = await fetchHtml(targetUrl);
+      const html = htmlResult.status === 'fulfilled' ? htmlResult.value : null;
+      if (!html) throw new Error('fetch failed');
       extracted = extract(html);
       if (isBlockedPage(extracted)) {
         analysisStatus = 'blocked';
@@ -1161,7 +1212,7 @@ module.exports = async (req, res) => {
 
   // No override and blocked/failed â†' try Gemini with domain-only signal, else ask user
   if (!override && (analysisStatus === 'blocked' || analysisStatus === 'failed')) {
-    const geminiRaw = await callAI(extracted, targetUrl, analysisStatus);
+    const geminiRaw = await callAI(extracted, targetUrl, analysisStatus, ddgSignal);
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName);
@@ -1208,7 +1259,7 @@ module.exports = async (req, res) => {
 
   if (override) {
     ({ primary, categories } = override);
-    const geminiRaw = await callAI(extracted, targetUrl, 'ok');
+    const geminiRaw = await callAI(extracted, targetUrl, 'ok', ddgSignal);
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
@@ -1233,7 +1284,7 @@ module.exports = async (req, res) => {
       });
     }
   } else {
-    const geminiRaw = await callAI(extracted, targetUrl, analysisStatus);
+    const geminiRaw = await callAI(extracted, targetUrl, analysisStatus, ddgSignal);
     const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
     if (gemini) {
       const mapped = applyGeminiResult(gemini, brandName || extracted.title);
