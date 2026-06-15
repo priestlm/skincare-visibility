@@ -2,6 +2,71 @@
 const http = require('http');
 const { URL } = require('url');
 
+// ── Upstash Redis question store ──────────────────────────────────────────────
+const KV_URL   = process.env.UPSTASH_REDIS_REST_URL;
+const KV_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+async function kvCmd(...args) {
+  if (!KV_URL || !KV_TOKEN) return null;
+  try {
+    const res = await fetch(KV_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KV_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    });
+    const j = await res.json();
+    return j.result ?? null;
+  } catch { return null; }
+}
+
+// Save a batch of questions to the store (fire-and-forget, capped at 600/category)
+async function saveQuestionsToStore(questions, category, niche, topics) {
+  if (!KV_URL || !questions.length) return;
+  const key = `qs:${category}`;
+  const topicArr = (topics || []).map(t => String(t).toLowerCase());
+  await Promise.all(questions.map(q =>
+    kvCmd('SADD', key, JSON.stringify({
+      q: q.question || q,
+      niche: (niche || '').toLowerCase(),
+      pt: q.prompt_type || q.promptType || 'discovery',
+      topics: topicArr,
+    }))
+  ));
+  // Trim to 600 per category to stay within free-tier memory
+  const size = await kvCmd('SCARD', key);
+  if (size > 600) await kvCmd('SPOP', key, size - 600);
+}
+
+// Retrieve stored questions filtered by category, scored by niche/topic relevance
+async function getStoredQuestions(category, niche, topicWords, needed, excludeSet) {
+  if (!KV_URL) return [];
+  const members = await kvCmd('SMEMBERS', `qs:${category}`);
+  if (!Array.isArray(members) || !members.length) return [];
+
+  const nicheL = (niche || '').toLowerCase();
+  const topicSet = new Set((topicWords || []).map(w => w.toLowerCase()));
+
+  const scored = members
+    .map(m => { try { return JSON.parse(m); } catch { return null; } })
+    .filter(Boolean)
+    .filter(item => !excludeSet.has((item.q || '').toLowerCase()))
+    .map(item => {
+      let score = 0;
+      if (nicheL && item.niche === nicheL) score += 10;
+      if (topicSet.size) score += (item.topics || []).filter(t => topicSet.has(t)).length;
+      return { ...item, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, needed);
+
+  return scored.map(item => ({
+    question: item.q,
+    search_intent: '',
+    evidence_term: '',
+    prompt_type: item.pt || 'discovery',
+  }));
+}
+
 // â”€â”€ Blocked/error page detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const BLOCKED_SIGNALS = [
   'access denied', 'forbidden', '403 forbidden', 'request blocked',
@@ -711,32 +776,49 @@ async function callOpenRouter(prompt) {
   return lastErr || { _error: 'openrouter_all_failed' };
 }
 
-// ── Top-up: ask AI for more questions when first pass returns < 20 ────────────
+// ── Top-up: stored questions first, then AI if still short ───────────────────
 async function topUpQuestions(aiResult, existingQs, brandPhrases, primaryKey, needed) {
+  const topicWords = (aiResult.allowed_topics || []).flatMap(t => t.toLowerCase().split(/[\s,&\/]+/)).filter(w => w.length > 2);
+  const niche = (aiResult.detected_niche || '').toLowerCase();
+  const existingSet = new Set(existingQs.map(q => q.question.toLowerCase()));
+
+  // 1. Try the question store first (fast, free, no AI call)
+  const stored = await getStoredQuestions(primaryKey, niche, topicWords, needed + 5, existingSet);
+  const storedFiltered = stored
+    .filter(q => !brandPhrases.some(p => q.question.toLowerCase().includes(p)))
+    .filter(q => !questionMismatch(q.question.toLowerCase(), primaryKey))
+    .slice(0, needed);
+
+  if (storedFiltered.length >= needed) {
+    console.log(`Top-up: served ${storedFiltered.length} from store`);
+    return storedFiltered;
+  }
+
+  // 2. Still short — ask AI for the remainder
+  const stillNeeded = needed - storedFiltered.length;
   const products = (aiResult.products_or_services_found || [])
     .flatMap(p => (p.examples || [p])).filter(s => typeof s === 'string').slice(0, 12).join(', ');
   const topics = (aiResult.allowed_topics || []).slice(0, 15).join(', ');
   const category = aiResult.primary_category || '';
-  const niche = aiResult.detected_niche || '';
-  const alreadyHave = existingQs.slice(0, 12).map(q => `- ${q.question}`).join('\n');
+  const allExisting = [...existingQs, ...storedFiltered];
+  const alreadyHave = allExisting.slice(0, 12).map(q => `- ${q.question}`).join('\n');
 
   const prompt = `You are generating search questions a real person would type into ChatGPT.
 
 Brand context:
 Category: ${category}${niche ? `\nNiche: ${niche}` : ''}
 Products / services: ${products || 'see category'}
-Topics relevant to this brand: ${topics}
+Topics: ${topics}
 
-Generate exactly ${needed} questions. Each must be a casual, natural sentence.
+Generate exactly ${stillNeeded} questions. Casual, natural, plain English.
 
 RULES:
 - Do NOT name any specific brand or company
-- Plain English — like a real person asking a friend or ChatGPT
 - Cover a mix of: what's best for X, where to buy, comparing options, gift ideas, specific product types
-- Do not repeat any of these already-generated questions:
+- Do not repeat:
 ${alreadyHave}
 
-Return ONLY a valid JSON array of strings. No explanation, no markdown:
+Return ONLY a valid JSON array of strings:
 [“question 1”, “question 2”, ...]`;
 
   async function tryProvider(which) {
@@ -768,22 +850,25 @@ Return ONLY a valid JSON array of strings. No explanation, no markdown:
   }
 
   const raw = await tryProvider('groq') || await tryProvider('openrouter');
-  if (!raw) return [];
+  let aiExtras = [];
+  if (raw) {
+    try {
+      const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+      const match = cleaned.match(/\[[\s\S]*\]/);
+      if (match) {
+        const arr = JSON.parse(match[0]);
+        const combined = new Set([...existingSet, ...storedFiltered.map(q => q.question.toLowerCase())]);
+        aiExtras = arr
+          .filter(q => typeof q === 'string' && q.length > 10)
+          .filter(q => !brandPhrases.some(p => q.toLowerCase().includes(p)))
+          .filter(q => !questionMismatch(q.toLowerCase(), primaryKey))
+          .filter(q => !combined.has(q.toLowerCase()))
+          .map(q => ({ question: q, search_intent: '', evidence_term: '', prompt_type: 'discovery' }));
+      }
+    } catch { /* ignore */ }
+  }
 
-  try {
-    const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-    const match = cleaned.match(/\[[\s\S]*\]/);
-    if (!match) return [];
-    const arr = JSON.parse(match[0]);
-    if (!Array.isArray(arr)) return [];
-    const existingSet = new Set(existingQs.map(q => q.question.toLowerCase()));
-    return arr
-      .filter(q => typeof q === 'string' && q.length > 10)
-      .filter(q => !brandPhrases.some(p => q.toLowerCase().includes(p)))
-      .filter(q => !questionMismatch(q.toLowerCase(), primaryKey))
-      .filter(q => !existingSet.has(q.toLowerCase()))
-      .map(q => ({ question: q, search_intent: '', evidence_term: '', prompt_type: 'discovery' }));
-  } catch { return []; }
+  return [...storedFiltered, ...aiExtras].slice(0, needed);
 }
 
 // â”€â”€ AI orchestrator: Groq â†' OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1247,6 +1332,7 @@ module.exports = async (req, res) => {
   const ai = aiRaw && !aiRaw._error ? aiRaw : null;
 
   if (!ai) {
+    // AI failed — try question store as emergency fallback (category unknown, use domain guess)
     return res.status(200).json({
       fetchedOk: false, needsManualCategory: true, aiAssisted: false,
       aiError: aiRaw?._error || 'ai_failed',
@@ -1299,4 +1385,12 @@ module.exports = async (req, res) => {
   if (!weakEvidence) cacheSet(cacheKey, responseData);
 
   res.status(200).json(responseData);
+
+  // Save all questions to the store (fire-and-forget after response sent)
+  saveQuestionsToStore(
+    questionsRich,
+    primary,
+    detectedNiche,
+    ai.allowed_topics || []
+  ).catch(() => {});
 };
