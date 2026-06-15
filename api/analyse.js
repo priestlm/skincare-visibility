@@ -954,18 +954,8 @@ function applyGeminiResult(gemini, brandNameInput) {
   //   (b) at least one meaningful content word in the question appears in evidenceTerms
   function questionSupported(q) {
     const ql = q.question.toLowerCase();
-    if (questionMismatch(ql, primaryKey)) return false;
-    // Check evidence_term field first (Gemini named it explicitly)
-    if (q.evidence_term && typeof q.evidence_term === 'string') {
-      const et = q.evidence_term.toLowerCase().trim();
-      if (et.length > 2 && evidenceTerms.has(et)) return true;
-      // Try individual words of evidence_term
-      const etWords = et.split(/[\s\/,&]+/).filter(w => w.length > 2);
-      if (etWords.some(w => evidenceTerms.has(w))) return true;
-    }
-    // Fallback: check question words against evidence terms
-    const words = ql.split(/[\s\/,'"?!.]+/).filter(w => w.length > 3 && !STOP_WORDS.has(w));
-    return words.some(w => evidenceTerms.has(w));
+    // Only discard questions that clearly mismatch the business category
+    return !questionMismatch(ql, primaryKey);
   }
 
   const validQs = normalisedQs.filter(questionSupported);
