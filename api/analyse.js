@@ -711,7 +711,82 @@ async function callOpenRouter(prompt) {
   return lastErr || { _error: 'openrouter_all_failed' };
 }
 
-// â”€â”€ AI orchestrator: Gemini â†' Groq â†' OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Top-up: ask AI for more questions when first pass returns < 20 ────────────
+async function topUpQuestions(aiResult, existingQs, brandPhrases, primaryKey, needed) {
+  const products = (aiResult.products_or_services_found || [])
+    .flatMap(p => (p.examples || [p])).filter(s => typeof s === 'string').slice(0, 12).join(', ');
+  const topics = (aiResult.allowed_topics || []).slice(0, 15).join(', ');
+  const category = aiResult.primary_category || '';
+  const niche = aiResult.detected_niche || '';
+  const alreadyHave = existingQs.slice(0, 12).map(q => `- ${q.question}`).join('\n');
+
+  const prompt = `You are generating search questions a real person would type into ChatGPT.
+
+Brand context:
+Category: ${category}${niche ? `\nNiche: ${niche}` : ''}
+Products / services: ${products || 'see category'}
+Topics relevant to this brand: ${topics}
+
+Generate exactly ${needed} questions. Each must be a casual, natural sentence.
+
+RULES:
+- Do NOT name any specific brand or company
+- Plain English — like a real person asking a friend or ChatGPT
+- Cover a mix of: what's best for X, where to buy, comparing options, gift ideas, specific product types
+- Do not repeat any of these already-generated questions:
+${alreadyHave}
+
+Return ONLY a valid JSON array of strings. No explanation, no markdown:
+[“question 1”, “question 2”, ...]`;
+
+  async function tryProvider(which) {
+    try {
+      const body = {
+        messages: [
+          { role: 'system', content: 'Return only a valid JSON array of strings. No markdown.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.5,
+        max_tokens: 1200,
+      };
+      if (which === 'groq' && process.env.GROQ_API_KEY) {
+        const r = await postJson('https://api.groq.com/openai/v1/chat/completions',
+          { ...body, model: 'llama-3.3-70b-versatile' }, 20000,
+          { Authorization: `Bearer ${process.env.GROQ_API_KEY}` });
+        if (r.status === 200) return r.body?.choices?.[0]?.message?.content || '';
+      }
+      if (which === 'openrouter' && process.env.OPENROUTER_API_KEY) {
+        for (const model of ['meta-llama/llama-3.1-8b-instruct:free', 'qwen/qwen3-8b:free', 'mistralai/mistral-7b-instruct:free']) {
+          const r = await postJson('https://openrouter.ai/api/v1/chat/completions',
+            { ...body, model }, 18000,
+            { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` });
+          if (r.status === 200) return r.body?.choices?.[0]?.message?.content || '';
+        }
+      }
+    } catch { /* ignore */ }
+    return '';
+  }
+
+  const raw = await tryProvider('groq') || await tryProvider('openrouter');
+  if (!raw) return [];
+
+  try {
+    const cleaned = raw.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+    const match = cleaned.match(/\[[\s\S]*\]/);
+    if (!match) return [];
+    const arr = JSON.parse(match[0]);
+    if (!Array.isArray(arr)) return [];
+    const existingSet = new Set(existingQs.map(q => q.question.toLowerCase()));
+    return arr
+      .filter(q => typeof q === 'string' && q.length > 10)
+      .filter(q => !brandPhrases.some(p => q.toLowerCase().includes(p)))
+      .filter(q => !questionMismatch(q.toLowerCase(), primaryKey))
+      .filter(q => !existingSet.has(q.toLowerCase()))
+      .map(q => ({ question: q, search_intent: '', evidence_term: '', prompt_type: 'discovery' }));
+  } catch { return []; }
+}
+
+// â”€â”€ AI orchestrator: Groq â†' OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function callAI(extracted, targetUrl, analysisStatus, ddgSignal) {
   const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal);
 
@@ -1181,10 +1256,24 @@ module.exports = async (req, res) => {
   }
 
   const mapped = applyGeminiResult(ai, brandName || '');
-  const { primaryKey: primary, categories, questions, questionsRich, weakEvidence,
+  let { primaryKey: primary, categories, questions, questionsRich, weakEvidence,
     brandName: aiBrand, organisationName, summary, customerType,
     detectedNiche, productsFound, productsStructured,
     customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
+
+  // Top-up: if AI gave fewer than 20 questions after filtering, ask for more
+  const MIN_QUESTIONS = 20;
+  if (questionsRich.length < MIN_QUESTIONS) {
+    const brandPhrases = [organisationName, aiBrand, brandName]
+      .map(s => (s || '').toLowerCase().trim()).filter(s => s.length > 3);
+    const needed = MIN_QUESTIONS - questionsRich.length;
+    console.log(`Top-up needed: have ${questionsRich.length}, requesting ${needed} more`);
+    const extra = await topUpQuestions(ai, questionsRich, brandPhrases, primary, needed + 3); // ask for a few extra to allow for filter losses
+    const combined = [...questionsRich, ...extra.slice(0, needed)];
+    questionsRich = combined;
+    questions = combined.map(q => q.question);
+    weakEvidence = combined.length < 3;
+  }
 
   const displayTitle = organisationName || aiBrand || brandName || targetUrl;
   const riskNarrative = buildRiskNarrative(displayTitle, primary, categories);
