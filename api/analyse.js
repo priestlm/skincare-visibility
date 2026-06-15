@@ -519,39 +519,57 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus) {
       bodyText    ? `Body text snippet: ${bodyText.slice(0, 800)}` : '',
     ].filter(Boolean).join('\n');
 
-  return `Analyse the website signals below. Return ONLY a valid JSON object â€” no markdown, no fences. Keep all string values under 20 words. Arrays max 5 items.
+  return `Analyse the website signals below. Return ONLY a valid JSON object — no markdown, no fences. Keep all string values under 25 words.
 
 {
-  "organisation_name": "trading name only",
-  "brand_name": "short searchable name",
-  "business_summary": "2-3 sentences in your own words",
-  "primary_category": "one exact value from the category list",
-  "secondary_categories": [],
-  "detected_niche": "specific sub-type e.g. Cornish cask ale brewery â€” empty if none",
-  "products_or_services_found": [{"category": "label", "examples": ["product 1", "product 2"]}],
-  "customer_channels": [{"channel": "e.g. Direct ecommerce / Pub supply", "reason": "one sentence"}],
-  "public_signals": ["award", "heritage", "location", "years trading"],
-  "market_or_location_signals": "e.g. Cornwall UK â€” empty if none",
-  "allowed_topics": ["topics from products/channels/signals only â€” questions must use ONLY these"],
-  "likely_search_intents": ["5 real customer needs: who is searching and why, e.g. 'dad buying a beer gift', 'bar manager finding local stock', 'couple planning a day out'"],
-  "example_ai_shopping_questions": [
-    {"question": "natural sentence as typed to ChatGPT â€” casual plain English, real-life detail, starts with find me/I'm looking for/can you recommend/where can I get/what's a good/I need", "search_intent": "who is searching and why", "evidence_term": "single key term from allowed_topics"}
+  “organisation_name”: “trading name only”,
+  “brand_name”: “short searchable name”,
+  “business_summary”: “2-3 sentences in your own words”,
+  “primary_category”: “one exact value from the category list”,
+  “secondary_categories”: [],
+  “detected_niche”: “specific sub-type e.g. Cornish cask ale brewery — empty if none”,
+  “products_or_services_found”: [{“category”: “label”, “examples”: [“product 1”, “product 2”]}],
+  “customer_channels”: [{“channel”: “e.g. Direct ecommerce / Pub supply”, “reason”: “one sentence”}],
+  “public_signals”: [“award”, “heritage”, “location”, “years trading”],
+  “market_or_location_signals”: “e.g. Cornwall UK — empty if none”,
+  “allowed_topics”: [“topics from products/channels/signals only — questions must use ONLY these”],
+  “likely_search_intents”: [“8 real customer needs: who is searching and why, e.g. 'dad buying a beer gift', 'bar manager finding local stock'”],
+  “example_ai_shopping_questions”: [
+    {
+      “question”: “natural sentence as typed to ChatGPT — casual plain English, real-life detail”,
+      “search_intent”: “who is searching and why in one sentence”,
+      “evidence_term”: “single key term from allowed_topics”,
+      “prompt_type”: “one of: discovery | location | comparison | occasion | gift | specific_product | awareness | trade”
+    }
   ],
-  "visibility_gaps": ["missing info a buyer would want"],
-  "confidence_score": 0.85
+  “visibility_gaps”: [“specific missing info a buyer would want — be concrete, not generic”],
+  “confidence_score”: 0.85
 }
 
 RULES:
-1. Classify from evidence. Brewery â†' "Food & drink". Skincare â†' "Beauty & skincare".
+1. Classify from evidence. Brewery → “Food & drink”. Skincare → “Beauty & skincare”.
 2. allowed_topics: ONLY topics found in the signals. Nothing invented.
-3. Questions must sound like a real person talking to ChatGPT â€” casual, plain English, not marketing copy. FORBIDDEN WORDS: award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, bespoke, curated, hospitality supplier. Also forbidden: business name, brand name, "you", "your".
-   GOOD: "I'm looking for a local brewery in Cornwall that sells to pubs â€” any recommendations?" / "where can I get Cornish beer delivered?" / "what's a good brewery near Truro to visit for a day out?"
-   BAD: "find me award-winning cask ales" / "recommend an independent brewery that supplies pubs wholesale"
+3. Questions must sound like a real person talking to ChatGPT — casual, plain English, not marketing copy.
+   FORBIDDEN WORDS: award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, bespoke, curated, hospitality supplier. Also forbidden: business name, brand name, “you”, “your”.
+   GOOD: “I'm looking for a local brewery in Cornwall that sells to pubs — any recommendations?” / “where can I get Cornish beer delivered?” / “what's a good brewery near Truro to visit for a day out?”
+   BAD: “find me award-winning cask ales” / “recommend an independent brewery that supplies pubs wholesale”
 4. Each question must use a term from allowed_topics. evidence_term must be in allowed_topics. Omit rather than invent.
 5. Do NOT write questions about categories not in products_or_services_found.
 6. confidence_score: 0.6-0.75 if website blocked.
+7. Generate AT LEAST 20 questions spread across the prompt_type categories. Minimum per type: discovery(4), location(2), specific_product(3), comparison(3), occasion(2), gift(2), awareness(2), trade(1 if B2B signals exist else omit). More questions = better coverage. Aim for 22-25.
+8. visibility_gaps: be specific — name actual product types, page types, or information the AI would need. Not “add more content” — say “no dedicated page for gluten-free nut butters” or “delivery postcodes not listed anywhere on site”.
 
-Categories: Fashion & apparel | Beauty & skincare | Homeware & dÃ©cor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
+prompt_type definitions:
+- discovery: “what's a good X for Y” or “best X for someone who Z” — category exploration
+- location: “X near me”, “X that delivers to [place]”, “where can I get X in [region]”
+- comparison: “X vs Y”, “is X better than Z”, “alternatives to [brand type]”
+- occasion: “X for [event/occasion]”, “X for [season/holiday]”
+- gift: “gift for someone who likes X”, “birthday/Christmas gift idea for X fan”
+- specific_product: query about a particular product type the business sells
+- awareness: “who sells X”, “where can I buy X online”, “where does X ship”
+- trade: “supplier of X for restaurants/bars/gyms”, “wholesale X” — only if B2B signals exist
+
+Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
 
 Website signals:
 ${signalsBlock}`;
@@ -565,7 +583,7 @@ async function callGemini(prompt) {
   const MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash'];
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 3000 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 5000 },
   };
 
   let result, usedModel;
@@ -871,12 +889,12 @@ function applyGeminiResult(gemini, brandNameInput) {
     ? gemini.example_ai_shopping_questions
     : [];
 
-  // Normalise to [{question, search_intent, evidence_term}]
+  // Normalise to [{question, search_intent, evidence_term, prompt_type}]
   const normalisedQs = rawAiQs.map(q => {
-    if (typeof q === 'string') return { question: q, search_intent: '', evidence_term: '' };
-    if (q && typeof q.question === 'string') return { question: q.question, search_intent: q.search_intent || q.why_relevant || '', evidence_term: q.evidence_term || '' };
+    if (typeof q === 'string') return { question: q, search_intent: '', evidence_term: '', prompt_type: 'discovery' };
+    if (q && typeof q.question === 'string') return { question: q.question, search_intent: q.search_intent || q.why_relevant || '', evidence_term: q.evidence_term || '', prompt_type: q.prompt_type || 'discovery' };
     return null;
-  }).filter(Boolean).filter(q => q.question.length > 5).slice(0, 5);
+  }).filter(Boolean).filter(q => q.question.length > 5).slice(0, 25);
 
   // Build a supported-terms set from everything Gemini extracted about this business.
   // Questions must use terms from this set â€” not generic category language.

@@ -99,6 +99,7 @@ Return ONLY valid JSON in this exact format (no markdown, no fences):
         return res.status(200).json({
           intro: parsed.intro || '',
           recommendations: recs,
+          recommendationCount: recs.length,
           businessMentioned: mentioned,
           businessName: businessName || '',
         });
@@ -132,6 +133,7 @@ Return ONLY valid JSON in this exact format (no markdown, no fences):
         return res.status(200).json({
           intro: parsed.intro || '',
           recommendations: recs,
+          recommendationCount: recs.length,
           businessMentioned: mentioned,
           businessName: businessName || '',
         });

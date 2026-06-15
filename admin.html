@@ -216,6 +216,53 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
 .rpt-footer-logo{display:flex;align-items:center;gap:6px;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#374151}
 .rpt-footer-logo .logo-icon{width:20px;height:20px;border-radius:5px}
 
+/* ── Confidence & quality badges ── */
+.conf-badge{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;font-weight:700;padding:3px 8px;border-radius:4px;text-transform:uppercase;white-space:nowrap;flex:none}
+.conf-badge.high{background:#ECFDF5;color:#059669;border:1px solid #6EE7B7}
+.conf-badge.moderate{background:#FFFBEB;color:#D97706;border:1px solid #FDE68A}
+.conf-badge.thin{background:#FFF7ED;color:#C2410C;border:1px solid #FED7AA}
+.conf-badge.empty{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+.result-type-tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;font-weight:700;padding:3px 9px;border-radius:4px;text-transform:uppercase;margin-top:6px}
+.result-type-tag.invisible{background:#FEF2F2;color:#991B1B;border:1px solid #FECACA}
+.result-type-tag.poor-result{background:#F9FAFB;color:#6B7280;border:1px solid #E5E7EB}
+.result-type-tag.visible{background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0}
+.result-type-tag.dominant{background:#EEF2FF;color:#3730A3;border:1px solid #C7D2FE}
+
+/* ── Prompt type badges ── */
+.ptype{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;padding:2px 7px;border-radius:3px;text-transform:uppercase;font-weight:600;border:1px solid;white-space:nowrap;flex:none}
+.ptype.discovery{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE}
+.ptype.location{background:#ECFDF5;color:#065F46;border-color:#A7F3D0}
+.ptype.comparison{background:#FDF4FF;color:#6B21A8;border-color:#E9D5FF}
+.ptype.occasion{background:#FFF7ED;color:#9A3412;border-color:#FED7AA}
+.ptype.gift{background:#FDF2F8;color:#9D174D;border-color:#FBCFE8}
+.ptype.specific_product{background:#F0FDF4;color:#15803D;border-color:#BBF7D0}
+.ptype.awareness{background:#F1F5F9;color:#475569;border-color:#CBD5E1}
+.ptype.trade{background:#FEF3C7;color:#92400E;border-color:#FDE68A}
+
+/* ── Competitor credibility tiers ── */
+.comp-cred{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;border:1px solid;white-space:nowrap}
+.comp-cred.confirmed{background:#ECFDF5;color:#059669;border-color:#6EE7B7}
+.comp-cred.moderate{background:#FFFBEB;color:#D97706;border-color:#FDE68A}
+.comp-cred.unverified{background:#F9FAFB;color:#9CA3AF;border-color:#E5E7EB}
+
+/* ── Month-on-month delta ── */
+.delta-section{margin-top:28px;padding:20px 24px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px}
+.delta-title{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:rgba(238,242,255,.38);margin-bottom:14px}
+.delta-grid{display:grid;grid-template-columns:repeat(4,auto);gap:24px;align-items:start;justify-content:start}
+.delta-cell{}
+.delta-lbl{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(238,242,255,.35);margin-bottom:4px}
+.delta-val{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;line-height:1}
+.delta-val.up{color:#34D399}
+.delta-val.down{color:#F87171}
+.delta-val.same{color:rgba(238,242,255,.5)}
+.delta-changes{margin-top:12px;display:flex;flex-direction:column;gap:5px}
+.delta-change{font-size:12.5px;color:rgba(238,242,255,.6);display:flex;align-items:center;gap:8px}
+.delta-change-icon{font-size:11px;flex:none;width:18px;text-align:center}
+
+/* ── Query progress bar ── */
+.gen-progress-wrap{width:100%;max-width:460px;background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;margin-top:8px}
+.gen-progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-w));border-radius:6px;transition:width .3s}
+
 /* ── Executive Summary ── */
 .exec-summary{padding:28px 56px 24px;background:linear-gradient(135deg,#F0F9FF 0%,#EEF2FF 100%);border-bottom:3px solid #E0E7FF}
 .exec-tier{display:flex;align-items:center;gap:12px;margin-bottom:6px}
@@ -487,6 +534,16 @@ document.querySelectorAll('.qf-btn').forEach(btn => {
 /* ── Generate report ── */
 document.getElementById('gen-btn').onclick = generateReport;
 
+async function fetchQuery(question, intent, promptType, orgName) {
+  const qr = await post('/api/ask', {question, businessName: orgName});
+  if (!qr.ok) throw new Error('HTTP ' + qr.status);
+  const qd = await qr.json();
+  if (qd.error || !Array.isArray(qd.recommendations)) throw new Error(qd.error || 'bad response');
+  const recCount = qd.recommendationCount || (qd.recommendations || []).length;
+  const quality = recCount >= 4 ? 'strong' : recCount >= 2 ? 'moderate' : recCount === 1 ? 'thin' : 'empty';
+  return {question, intent, promptType, intro: qd.intro || '', recommendations: qd.recommendations || [], businessMentioned: qd.businessMentioned || false, recCount, quality};
+}
+
 async function generateReport() {
   const url = document.getElementById('gen-url').value.trim();
   if (!url) { document.getElementById('gen-url').focus(); return; }
@@ -497,85 +554,108 @@ async function generateReport() {
   document.getElementById('gen-sub').textContent = (brand || url) + ' · ' + market;
   document.getElementById('gen-btn').disabled = true;
 
-  const STEP_IDS = ['analyse','q1','q2','q3','q4','q5','build'];
-  const STEP_LABELS = [
-    'Analysing website and detecting category…',
-    'Querying AI: question 1…',
-    'Querying AI: question 2…',
-    'Querying AI: question 3…',
-    'Querying AI: question 4…',
-    'Querying AI: question 5…',
-    'Building report…',
-  ];
-  renderSteps(STEP_IDS, STEP_LABELS);
+  renderSteps(
+    ['analyse', 'query', 'build'],
+    ['Analysing website and detecting category…', 'Testing AI visibility — preparing queries…', 'Building report…']
+  );
 
   try {
     // Step 1 — analyse
-    setStep('analyse','active');
+    setStep('analyse', 'active');
     const ar = await post('/api/analyse', {url, brandName: brand, market});
     if (!ar.ok) throw new Error('Analysis failed (' + ar.status + ')');
     const analysis = await ar.json();
-    setStep('analyse','done','Category: ' + (analysis.primary || 'unknown'));
+    setStep('analyse', 'done', 'Category: ' + (analysis.primary || 'unknown'));
 
     const orgName = analysis.organisationName || analysis.title || brand || url;
 
-    // Extract questions
+    // Extract questions (up to 25)
     const questions = [];
     if (Array.isArray(analysis.questionsRich) && analysis.questionsRich.length) {
       analysis.questionsRich.forEach(q => {
         const t = typeof q === 'string' ? q : (q.question || '');
         const i = typeof q === 'object' ? (q.search_intent || '') : '';
-        if (t) questions.push({question:t, intent:i});
+        const p = typeof q === 'object' ? (q.prompt_type || 'discovery') : 'discovery';
+        if (t) questions.push({question: t, intent: i, promptType: p});
       });
     } else {
-      (analysis.questions || []).forEach(q => { if (q) questions.push({question:q, intent:''}); });
+      (analysis.questions || []).forEach(q => { if (q) questions.push({question: q, intent: '', promptType: 'discovery'}); });
     }
 
-    // Hide unused question steps
-    const activeQCount = Math.min(questions.length, 5);
-    for (let j = activeQCount; j < 5; j++) {
-      const el = document.getElementById('gstep-q'+(j+1));
-      if (el) el.style.display = 'none';
-    }
-
-    // Steps 2–6 — ask AI for each question
+    // Step 2 — run queries in parallel batches of 5
+    const BATCH = 5;
     const qResults = [];
     const compCount = {};
+    const compPromptTypes = {};
     let mentionCount = 0;
-    const qIds = ['q1','q2','q3','q4','q5'];
+    let doneCount = 0;
+    const totalQ = questions.length;
 
-    for (let i = 0; i < activeQCount; i++) {
-      const q = questions[i];
-      const sid = qIds[i];
-      setStep(sid, 'active', '"' + q.question.slice(0, 55) + (q.question.length > 55 ? '…' : '') + '"');
-      try {
-        const qr = await post('/api/ask', {question: q.question, businessName: orgName});
-        const qd = await qr.json();
-        if (qd.error || !Array.isArray(qd.recommendations)) {
-          setStep(sid, 'err', 'No response');
-          qResults.push({question:q.question, intent:q.intent, recommendations:[], businessMentioned:false, error:true});
-        } else {
+    // Add progress bar to query step
+    const qStepEl = document.getElementById('gstep-query');
+    if (qStepEl) {
+      const pb = document.createElement('div');
+      pb.className = 'gen-progress-wrap';
+      pb.innerHTML = '<div class="gen-progress-bar" id="gen-pb" style="width:0%"></div>';
+      qStepEl.appendChild(pb);
+    }
+
+    setStep('query', 'active', '0/' + totalQ + ' queries complete');
+
+    for (let i = 0; i < questions.length; i += BATCH) {
+      const batch = questions.slice(i, i + BATCH);
+      const settled = await Promise.allSettled(
+        batch.map(q => fetchQuery(q.question, q.intent, q.promptType, orgName))
+      );
+
+      for (const res of settled) {
+        if (res.status === 'fulfilled') {
+          const qd = res.value;
           if (qd.businessMentioned) mentionCount++;
           (qd.recommendations || []).forEach(r => {
-            const n = (r.name||'').trim();
+            const n = (r.name || '').trim();
             if (!n) return;
             const nl = n.toLowerCase(), bl = orgName.toLowerCase();
-            if (!nl.includes(bl) && !bl.includes(nl)) compCount[n] = (compCount[n]||0)+1;
+            if (!nl.includes(bl) && !bl.includes(nl)) {
+              compCount[n] = (compCount[n] || 0) + 1;
+              if (!compPromptTypes[n]) compPromptTypes[n] = [];
+              if (!compPromptTypes[n].includes(qd.promptType)) compPromptTypes[n].push(qd.promptType);
+            }
           });
-          qResults.push({question:q.question, intent:q.intent, intro:qd.intro||'', recommendations:qd.recommendations, businessMentioned:qd.businessMentioned||false});
-          setStep(sid,'done', qd.businessMentioned ? '✓ Your brand appears' : '✗ Not mentioned');
+          qResults.push(qd);
+        } else {
+          const q = batch[qResults.length - (i) < batch.length ? qResults.length - i : 0] || {question: '', intent: '', promptType: 'discovery'};
+          qResults.push({question: q.question, intent: q.intent, promptType: q.promptType, recommendations: [], businessMentioned: false, recCount: 0, quality: 'empty', error: true});
         }
-      } catch(e) {
-        setStep(sid,'err','Request failed');
-        qResults.push({question:q.question, intent:q.intent, recommendations:[], businessMentioned:false, error:true});
+        doneCount++;
+        const pct = Math.round((doneCount / totalQ) * 100);
+        const pb = document.getElementById('gen-pb');
+        if (pb) pb.style.width = pct + '%';
+        setStep('query', 'active', doneCount + '/' + totalQ + ' queries complete');
       }
     }
 
-    // Step 7 — build
-    setStep('build','active');
-    const score = qResults.length ? Math.round((mentionCount / qResults.length)*100) : 0;
-    const topComp = Object.entries(compCount).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,count])=>({name,count}));
+    setStep('query', 'done', mentionCount + '/' + totalQ + ' queries — brand appeared');
+
+    // Step 3 — build
+    setStep('build', 'active');
+    const validResults = qResults.filter(q => !q.error);
+    const score = validResults.length ? Math.round((mentionCount / validResults.length) * 100) : 0;
+    const topComp = Object.entries(compCount)
+      .sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([name, count]) => ({name, count, promptTypes: compPromptTypes[name] || [], credibility: count >= 3 ? 'confirmed' : count >= 2 ? 'moderate' : 'unverified'}));
     const recs = buildRecs(orgName, score, qResults, topComp, analysis);
+
+    // Month-on-month delta
+    const normUrl = u => u.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
+    const prevReport = reports.find(r => normUrl(r.business.url) === normUrl(url));
+    const delta = prevReport ? {
+      scoreDelta: score - prevReport.visibilityScore,
+      prevScore: prevReport.visibilityScore,
+      prevDate: prevReport.generatedAt,
+      prevMentions: prevReport.mentionCount,
+      prevTotal: prevReport.totalQ,
+    } : null;
 
     current = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2,5),
@@ -593,11 +673,15 @@ async function generateReport() {
         locationSignals: analysis.locationSignals || '',
         customerType: analysis.customerType || '',
       },
-      visibilityScore: score, mentionCount, totalQ: qResults.length,
-      queryResults: qResults, topCompetitors: topComp,
+      visibilityScore: score,
+      mentionCount,
+      totalQ: validResults.length,
+      queryResults: qResults,
+      topCompetitors: topComp,
       visibilityGaps: analysis.visibilityGaps || [],
       riskNarrative: analysis.riskNarrative || '',
       recommendations: recs,
+      delta,
     };
 
     setStep('build','done','Report ready');
@@ -615,87 +699,111 @@ async function generateReport() {
 /* ── Build recommendations ── */
 function buildRecs(name, score, qResults, topComp, analysis) {
   const recs = [];
-  const total = qResults.length;
-  const missed = qResults.filter(q => !q.businessMentioned && !q.error);
+  const validResults = qResults.filter(q => !q.error);
+  const total = validResults.length;
+  const missed = validResults.filter(q => !q.businessMentioned);
+  const strongMissed = missed.filter(q => q.quality === 'strong' || q.quality === 'moderate');
   const topCompetitor = topComp.length ? topComp[0] : null;
   const hasSignals = (analysis.publicSignals || []).length > 0;
   const prodCount = (analysis.productsFound || []).length;
+  const prods = analysis.productsStructured || [];
+  const loc = analysis.locationSignals || '';
+  const channels = analysis.customerChannels || [];
+  const signals = analysis.publicSignals || [];
 
-  // Action 1 — core visibility gap
+  const prodExamples = prods.flatMap(p => (p.examples || []).slice(0, 2)).slice(0, 4);
+  const prodCats = prods.map(p => p.category).slice(0, 3);
+  const ecomChannel = channels.find(c => /ecommerce|online|direct/i.test(c.channel));
+  const tradeChannel = channels.find(c => /trade|wholesale|pub|restaurant|bar/i.test(c.channel));
+
+  // Action 1: core gap, specific to detected query types
+  const missedByType = {};
+  strongMissed.forEach(q => { const t = q.promptType || 'discovery'; (missedByType[t] = missedByType[t] || []).push(q); });
+  const topMissedType = Object.entries(missedByType).sort((a,b) => b[1].length - a[1].length)[0];
+
   if (score === 0) {
+    const prodLine = prodExamples.length ? ' — specifically for ' + prodExamples.slice(0, 2).join(', ') : '';
     recs.push({
       priority: 'high',
       title: 'Create AI-visible content from scratch',
-      what: 'Write factual, crawlable content on your website that directly answers each of the ' + total + ' buyer questions in this report. Use conversational language matching how customers ask AI assistants — no marketing copy.',
-      why: 'AI models recommend brands whose websites contain clear answers to the questions buyers ask. Without this content, you cannot appear in AI responses regardless of brand quality.',
-      impact: 'Appearing in even 2–3 tested queries would move you out of the Weak tier and provide a measurable baseline for monthly improvement tracking.'
+      what: 'Write a dedicated FAQ or “what we offer” page that directly answers the ' + total + ' buyer questions in this report' + prodLine + '. Use plain, conversational language — write exactly how a customer would ask the question.',
+      why: 'AI models recommend brands whose website content explicitly addresses what buyers are asking. Without this, ' + name + ' is invisible regardless of brand quality or product range.',
+      impact: 'Appearing in 3–4 of the tested queries would move you from Weak to Moderate visibility — a measurable improvement verifiable in next month\'s report.'
     });
   } else if (score < 50) {
-    const missedSample = missed.slice(0, 2).map(q => '“' + q.question.slice(0, 60) + '”').join(' and ');
+    const missedSample = strongMissed.slice(0, 2).map(q => '”' + q.question.slice(0, 65) + '”').join(', ');
+    const typeHint = topMissedType ? ' — particularly ' + topMissedType[0].replace('_', ' ') + '-type queries' : '';
     recs.push({
       priority: 'high',
-      title: 'Fill the content gaps driving your low score',
-      what: 'Create FAQ or landing page content targeting the specific queries where you\'re absent' + (missedSample ? ' — particularly: ' + missedSample : '') + '. Answer each question in plain English, directly and concisely.',
-      why: 'AI models surface brands that explicitly address the buyer\'s question. Where your content is missing, competitors fill the gap by default.',
-      impact: 'Addressing 2–3 missing queries should push your score above 50, moving from Limited to Moderate visibility in the next monthly report.'
+      title: 'Target the specific query types where you\'re invisible',
+      what: 'Create content addressing' + typeHint + '. Priority queries: ' + (missedSample || 'see the Visibility Results section') + '. A dedicated FAQ page answering each one directly is the fastest route.',
+      why: 'These are queries that returned 3–5 competitor recommendations — the AI has no shortage of answers, it just isn\'t finding ' + name + '.',
+      impact: 'Winning 3–4 additional query appearances would push your score above 50 and into the Moderate tier in next month\'s report.'
     });
   } else {
+    const missedCount = missed.length;
     recs.push({
       priority: 'medium',
-      title: 'Convert your remaining query gaps into wins',
-      what: 'Review the ' + missed.length + ' quer' + (missed.length === 1 ? 'y' : 'ies') + ' where you didn\'t appear and create specific content for each. These are the fastest visibility wins available to you right now.',
-      why: 'At moderate visibility, each additional query appearance compounds your authority signal. Competitors will optimise — acting now protects your current position.',
-      impact: 'Gaining 1–2 additional query appearances would reach the Strong tier (75+), making you a category leader in AI recommendations.'
+      title: 'Close the remaining ' + missedCount + ' query gap' + (missedCount !== 1 ? 's' : '') + ' to reach Strong visibility',
+      what: 'Focus on the ' + missedCount + ' queries where you didn\'t appear (marked in Visibility Results). Each one needs specific content — a page, section, or FAQ entry that directly addresses that buyer need.',
+      why: 'At Moderate visibility, you\'re already doing the hard work. Each additional query win compounds your authority signal and narrows the gap to competitors.',
+      impact: (missedCount <= 3 ? 'Closing these gaps' : 'Addressing 3–4 of these') + ' would bring you to Strong visibility (75+) — category leadership in AI results.'
     });
   }
 
-  // Action 2 — product/service specificity
-  if (prodCount < 4) {
+  // Action 2: product specificity using detected products
+  if (prodCount < 4 || prodExamples.length < 2) {
+    const catLine = prodCats.length ? ' for ' + prodCats.join(', ') : '';
     recs.push({
       priority: 'high',
-      title: 'Add structured product and service pages',
-      what: 'Create individual pages or dedicated sections for each product or service type. Use specific product names in H1/H2 headings and add Schema.org Product markup. Avoid generic category names — be specific.',
-      why: 'AI models extract product information from page structure. Without clearly named, specific product content, the AI cannot confidently recommend you for product-specific queries.',
-      impact: 'Structured product pages typically produce the largest single improvement for product-based businesses — expect 1–3 new query appearances after indexing.'
+      title: 'Add dedicated product pages with specific names in headings',
+      what: 'Create individual pages or sections' + catLine + '. Use the exact product names (' + (prodExamples.length ? prodExamples.join(', ') : 'your specific product SKUs') + ') in H1/H2 headings. Add Schema.org Product markup. Each page should answer: what it is, who it\'s for, where to buy it.',
+      why: 'AI models extract product identity from page structure. Generic category pages (“our range”) give the AI nothing to match against a specific buyer query.',
+      impact: 'Named product pages are typically the single largest driver of AI visibility improvement — expect 2–4 new query appearances after Google re-indexes.'
     });
   } else {
+    const prodLine = prodExamples.length ? ' (' + prodExamples.join(', ') + ')' : '';
     recs.push({
       priority: 'medium',
-      title: 'Enrich product pages with buyer-decision content',
-      what: 'Add comparison sections, common questions, and "why choose us" content to each product page. Include pricing, ingredients/materials, certifications, and availability information where relevant.',
-      why: 'AI models favour brands that provide complete buying-decision information — not just product descriptions. Depth of content signals authority.',
-      impact: 'Richer product content improves visibility for higher-intent queries where buyers are close to purchasing — the most commercially valuable AI appearances.'
+      title: 'Add buying-decision content to your product pages',
+      what: 'For each product' + prodLine + ', add: who it\'s best for, what makes it different, common questions about it, and stockist/availability information' + (loc ? ' in ' + loc : '') + '. Avoid marketing language — write as if advising a friend.',
+      why: 'AI models favour brands that provide complete information for a buying decision, not just descriptions. Depth of content signals category expertise.',
+      impact: 'Richer product pages improve visibility for high-intent comparison and specific-product queries — the queries closest to a purchase decision.'
     });
   }
 
-  // Action 3 — competitor intelligence
+  // Action 3: specific competitor audit
   if (topCompetitor) {
+    const compTypes = (topCompetitor.promptTypes || []).slice(0, 2).join(' and ');
     recs.push({
       priority: 'medium',
-      title: 'Audit ' + topCompetitor.name + '\'s AI content strategy',
-      what: 'Review ' + topCompetitor.name + '\'s website for: (1) how they describe their products, (2) which buyer questions they address directly, (3) which third-party sites reference them (press, directories, reviews).',
-      why: topCompetitor.name + ' appeared in ' + topCompetitor.count + ' of ' + total + ' tested queries. The content signals driving their AI visibility are largely visible and replicable.',
-      impact: 'Understanding and matching competitor content patterns is the fastest route to competitive AI visibility parity — typically achievable within 1–2 content updates.'
+      title: 'Audit ' + topCompetitor.name + '\'s website for replicable content signals',
+      what: 'Visit ' + topCompetitor.name + '\'s site and document: (1) product page structure and headings, (2) FAQ content and how they phrase answers, (3) any third-party mentions visible via a Google search for their name.',
+      why: topCompetitor.name + ' appeared in ' + topCompetitor.count + '/' + total + ' tested queries' + (compTypes ? ', especially ' + compTypes + ' queries' : '') + '. Their content approach is a concrete, replicable benchmark.',
+      impact: 'Matching the content depth of the category\'s most visible AI brand is the fastest route to parity on the specific query types you\'re losing.'
     });
   }
 
-  // Action 4 — FAQ / Q&A
-  const sampleQ = qResults.find(q => !q.error) ? '“' + qResults.find(q => !q.error).question + '”' : 'the buyer questions in this report';
+  // Action 4: location/channel-specific FAQ
+  const locLine = loc ? ' targeting buyers ' + (loc.toLowerCase().includes('uk') ? 'in the UK' : 'in ' + loc) : '';
+  const channelLine = ecomChannel ? ' Include delivery areas, postcode coverage, and ordering details.' : tradeChannel ? ' Include trade pricing, minimum orders, and lead times.' : '';
   recs.push({
     priority: 'medium',
-    title: 'Build a buyer FAQ targeting AI query patterns',
-    what: 'Create a FAQ section using the exact queries from this report as a starting point. Write 2–4 sentence answers per question in plain English — factual and direct. Avoid marketing language entirely.',
-    why: 'AI assistants frequently surface brands that explicitly answer the buyer\'s exact question. FAQ content is the most efficient format for matching AI query patterns at scale.',
-    impact: 'A well-structured FAQ can improve visibility across multiple query types simultaneously within 4–8 weeks of being indexed and crawled.'
+    title: 'Build a customer FAQ using the exact queries from this report',
+    what: 'Create a FAQ page using the ' + total + ' tested queries as your question list' + locLine + '. Write 3–5 sentence answers — factual and direct.' + channelLine + ' Publish at /faq or integrate into your homepage.',
+    why: 'AI assistants frequently surface brands that answer the buyer\'s exact question verbatim. FAQ content is the highest-leverage format for matching AI query patterns across multiple question types.',
+    impact: 'A well-structured FAQ typically produces 3–6 new query appearances within 4–8 weeks of Google indexing — and also directly reduces customer support load.'
   });
 
-  // Action 5 — third-party authority
+  // Action 5: third-party signals with specificity
+  const signalLine = signals.length ? ' You already have signals to build on: ' + signals.slice(0, 3).join(', ') + '.' : '';
+  const locPressLine = loc ? ' Focus on ' + loc + '-based publications, directories, and industry bodies.' : '';
   recs.push({
     priority: 'low',
-    title: 'Build third-party citation authority',
-    what: 'Identify publications, review platforms, and industry directories appearing in competitor AI results. Develop an outreach programme targeting those specific outlets' + (hasSignals ? ' — you have existing signals (awards, press) to build from' : '') + '.',
-    why: 'AI models weight third-party references when assessing brand credibility. Press mentions, awards, and trusted directory listings act as quality signals influencing AI recommendations.',
-    impact: 'Third-party signals compound over time — each new citation increases your authority baseline and makes future AI recommendations more likely across new queries.'
+    title: 'Build third-party citation authority in your category',
+    what: 'Identify press outlets, review platforms, and directories that appear in competitor AI results. Google “[' + (prodCats[0] || 'your category') + '] recommendations UK” and note which editorial sites appear.' + signalLine + locPressLine,
+    why: 'AI models use third-party references to assess brand credibility. A brand cited in trusted publications is far more likely to appear in AI recommendations than one whose only presence is its own website.',
+    impact: 'Third-party signals compound — each citation raises your authority baseline. Combined with strong website content, this separates brands that appear occasionally from those that appear consistently.'
   });
 
   return recs.slice(0, 5);
@@ -727,13 +835,41 @@ function renderReport(r) {
     <text x="60" y="72" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" fill="rgba(255,255,255,.45)">/100</text>
   </svg>`;
 
+  // Score excludes poor-quality results from denominator
+  const strongResults = queryResults.filter(q => !q.error && (q.quality === 'strong' || q.quality === 'moderate'));
+  const poorResults = queryResults.filter(q => !q.error && (q.quality === 'thin' || q.quality === 'empty'));
+  const scoreNote = poorResults.length > 0 ? ' (' + poorResults.length + ' low-quality result' + (poorResults.length > 1 ? 's' : '') + ' excluded from score)' : '';
+
   const coverInterp = score >= 75
-    ? biz.name + ' has strong AI visibility — appearing in most tested queries. The priority is maintaining this lead and closing the remaining gaps before competitors optimise.'
+    ? biz.name + ' has strong AI visibility — appearing in most well-formed queries tested. The priority is maintaining this position and closing remaining gaps before competitors optimise.'
     : score >= 50
-    ? biz.name + ' has moderate AI visibility — appearing in some queries but missing others. Targeted content improvements in the right areas could significantly strengthen this position.'
+    ? biz.name + ' has moderate AI visibility — appearing in some queries but absent from others where competitors are winning. Targeted content improvements can close these gaps.'
     : score >= 25
-    ? biz.name + ' has limited AI visibility — rarely recommended by AI assistants in your category. Structural content changes are needed before this becomes a meaningful sales channel.'
-    : biz.name + ' has weak AI visibility — not appearing in AI recommendations for your category. Immediate action is required to establish a presence before competitors widen the gap further.';
+    ? biz.name + ' has limited AI visibility — rarely recommended by AI assistants in your category. Content that directly addresses buyer questions is the primary lever for improvement.'
+    : 'AI visibility for ' + biz.name + ' is not yet established — the brand did not appear in AI recommendations for the queries tested. This report identifies exactly what needs to change.';
+
+  // Delta
+  const delta = r.delta;
+  const deltaHtml = delta ? (() => {
+    const d = delta.scoreDelta;
+    const dCls = d > 0 ? 'up' : d < 0 ? 'down' : 'same';
+    const dStr = d > 0 ? '+' + d : String(d);
+    const prevDate = new Date(delta.prevDate).toLocaleDateString('en-GB', {day:'numeric',month:'short'});
+    const changedQueries = queryResults.filter((q, i) => {
+      // Try to match by question text against previous results (best-effort)
+      return false; // placeholder — per-query comparison requires same questions
+    });
+    return `<div class="delta-section">
+      <div class="delta-title">vs previous report (${prevDate})</div>
+      <div class="delta-grid">
+        <div class="delta-cell"><div class="delta-lbl">Score change</div><div class="delta-val ${dCls}">${dStr}</div></div>
+        <div class="delta-cell"><div class="delta-lbl">Previous score</div><div class="delta-val same">${delta.prevScore}</div></div>
+        <div class="delta-cell"><div class="delta-lbl">Previous appearances</div><div class="delta-val same">${delta.prevMentions}/${delta.prevTotal}</div></div>
+        <div class="delta-cell"><div class="delta-lbl">Current appearances</div><div class="delta-val ${dCls}">${mentionCount}/${totalQ}</div></div>
+      </div>
+      ${d > 0 ? `<div class="delta-changes"><div class="delta-change"><span class="delta-change-icon">↑</span>Score improved by ${d} points since last report</div></div>` : d < 0 ? `<div class="delta-changes"><div class="delta-change"><span class="delta-change-icon">↓</span>Score declined by ${Math.abs(d)} points — check the query results for regressions</div></div>` : `<div class="delta-changes"><div class="delta-change"><span class="delta-change-icon">→</span>Score unchanged from last report</div></div>`}
+    </div>`;
+  })() : '';
 
   // ── Executive summary data ──
   const missed = queryResults.filter(q => !q.businessMentioned && !q.error);
@@ -775,12 +911,17 @@ function renderReport(r) {
       : '<span style="color:#9CA3AF;font-size:13px">Limited product data detected</span>';
 
   // ── AI prompts tested ──
+  const ptypeLabel = {discovery:'Discovery',location:'Location',comparison:'Comparison',occasion:'Occasion',gift:'Gift',specific_product:'Product',awareness:'Awareness',trade:'Trade'};
   const promptsHtml = queryResults.map((q, i) => {
     const status = q.error ? 'error' : q.businessMentioned ? 'appeared' : 'not-appeared';
     const statusLabel = q.error ? 'No data' : q.businessMentioned ? '✓ Appeared' : '✗ Not found';
+    const pt = q.promptType || 'discovery';
     return `<div class="prompt-item ${status}">
       <span class="prompt-num">${i + 1}</span>
-      <div class="prompt-body">
+      <div class="prompt-body" style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span class="ptype ${pt}">${ptypeLabel[pt] || pt}</span>
+        </div>
         <div class="prompt-q">${x(q.question)}</div>
         ${q.intent ? `<div class="prompt-intent">${x(q.intent)}</div>` : ''}
       </div>
@@ -789,10 +930,25 @@ function renderReport(r) {
   }).join('');
 
   // ── Visibility results per query ──
+  const confLabel = {strong:'High confidence',moderate:'Moderate confidence',thin:'Thin result',empty:'Poor AI result'};
+  const confDesc = {
+    strong: 'The AI returned 4–5 specific recommendations — this is a reliable result.',
+    moderate: 'The AI returned 2–3 recommendations — treat directionally, not definitively.',
+    thin: 'Only 1 recommendation returned — the AI may have been uncertain about this query. Treat with caution.',
+    empty: 'The AI returned no recommendations — this may reflect an ambiguous query, a poorly-scoped question, or a topic outside AI\'s knowledge. This result does not mean your brand is invisible; it means we can\'t draw a conclusion from this query.'
+  };
+
   const qHtml = queryResults.map((q, qi) => {
+    const pt = q.promptType || 'discovery';
     if (q.error) return `<div class="q-item">
-      <div class="q-head"><span class="q-text">${x(q.question)}</span><span class="q-status no">No data</span></div>
-      <div class="q-body"><p class="q-err">AI response unavailable for this query — the provider did not return a result.</p></div>
+      <div class="q-head">
+        <span class="q-text">${x(q.question)}</span>
+        <div style="display:flex;gap:8px;flex:none;align-items:center">
+          <span class="ptype ${pt}">${ptypeLabel[pt] || pt}</span>
+          <span class="q-status no">API error</span>
+        </div>
+      </div>
+      <div class="q-body"><p class="q-err">Request failed — the AI provider did not return a result. This query is excluded from your visibility score.</p></div>
     </div>`;
 
     const bl = biz.name.toLowerCase();
@@ -801,6 +957,7 @@ function renderReport(r) {
       return !rl.includes(bl) && !bl.includes(rl);
     });
     const compNames = competitors.slice(0, 3).map(c => c.name).join(', ');
+    const quality = q.quality || (q.recCount >= 4 ? 'strong' : q.recCount >= 2 ? 'moderate' : q.recCount === 1 ? 'thin' : 'empty');
 
     const recsHtml = (q.recommendations || []).map((rec, i) => {
       const rl = (rec.name || '').toLowerCase();
@@ -812,57 +969,89 @@ function renderReport(r) {
       </div>`;
     }).join('');
 
-    // Plain-English interpretation
-    let interp = '';
-    if (q.businessMentioned && competitors.length === 0) {
-      interp = biz.name + ' is the only brand the AI recommended for this query — a strong signal of category authority for this specific need.';
-    } else if (q.businessMentioned && competitors.length > 0) {
-      interp = biz.name + ' appears alongside ' + compNames + '. The AI sees your brand as relevant here, but you\'re sharing the spotlight — deepening your content on this topic could earn a stronger recommendation.';
-    } else if (!q.businessMentioned && competitors.length > 0) {
-      interp = biz.name + ' was not mentioned. The AI recommended ' + compNames + ' instead. This suggests your website doesn\'t provide enough content addressing "' + q.question.slice(0, 60) + (q.question.length > 60 ? '…' : '') + '" — creating a dedicated page or FAQ entry for this topic is the most direct fix.';
+    // Determine result type and interpretation
+    let resultType, resultTag, interp;
+    if (quality === 'empty' || quality === 'thin') {
+      resultType = 'poor-result';
+      resultTag = quality === 'empty' ? 'Poor AI result' : 'Thin result — low confidence';
+      interp = confDesc[quality];
+    } else if (q.businessMentioned && competitors.length === 0) {
+      resultType = 'dominant';
+      resultTag = 'Only brand recommended';
+      interp = biz.name + ' is the only brand the AI recommended — a strong signal of category authority for this specific buyer need. Maintain the content that\'s driving this.';
+    } else if (q.businessMentioned) {
+      resultType = 'visible';
+      resultTag = 'Visible — sharing with ' + competitors.length + ' competitor' + (competitors.length !== 1 ? 's' : '');
+      interp = biz.name + ' appears alongside ' + compNames + '. The AI sees your brand as relevant here, but you\'re sharing the spotlight. Deepening your content on this specific topic could earn a stronger or more prominent recommendation.';
     } else {
-      interp = 'No brands were confidently recommended for this query — an opportunity to establish first-mover visibility in this area.';
+      resultType = 'invisible';
+      resultTag = 'Not found — competitors taking this position';
+      interp = biz.name + ' was not mentioned. The AI recommended ' + (compNames || 'other brands') + ' instead. This is a genuine visibility gap — your website likely lacks content that explicitly addresses "' + q.question.slice(0, 70) + (q.question.length > 70 ? '…' : '') + '". A specific FAQ entry or landing page for this topic is the most direct fix.';
     }
 
     return `<div class="q-item">
       <div class="q-head">
-        <span class="q-text">${x(q.question)}</span>
-        <span class="q-status ${q.businessMentioned ? 'yes' : 'no'}">${q.businessMentioned ? '✓ Mentioned' : '✗ Not mentioned'}</span>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span class="ptype ${pt}">${ptypeLabel[pt] || pt}</span>
+            <span class="conf-badge ${quality}">${confLabel[quality]}</span>
+          </div>
+          <span class="q-text" style="display:block">${x(q.question)}</span>
+        </div>
+        <span class="q-status ${q.businessMentioned && quality !== 'empty' ? 'yes' : 'no'}" style="margin-left:12px">${q.businessMentioned ? '✓ Appeared' : quality === 'empty' ? '— No result' : '✗ Not found'}</span>
       </div>
       <div class="q-body">
-        ${q.intro ? `<p class="q-intro">${x(q.intro)}</p>` : ''}
-        <div class="q-interpretation"><span class="q-interp-label">What this means</span>${x(interp)}</div>
-        ${recsHtml ? `<div class="q-comp-label">AI recommendations for this query</div><div class="q-recs">${recsHtml}</div>` : `<div class="q-nodata">No recommendations returned for this query.</div>`}
+        <span class="result-type-tag ${resultType}">${x(resultTag)}</span>
+        <div class="q-interpretation" style="margin-top:10px"><span class="q-interp-label">What this means</span>${x(interp)}</div>
+        ${recsHtml ? `<div class="q-comp-label">AI recommendations returned for this query</div><div class="q-recs">${recsHtml}</div>` : ''}
       </div>
     </div>`;
   }).join('');
 
-  // ── Competitor bars ──
+  // ── Competitor bars with credibility tiers ──
+  const validQ = queryResults.filter(q => !q.error && (q.quality === 'strong' || q.quality === 'moderate')).length;
   const maxC = topCompetitors.length ? topCompetitors[0].count : 1;
   const compBarsHtml = topCompetitors.length
-    ? topCompetitors.map(c => `<div class="comp-row">
-        <span class="comp-name">${x(c.name)}</span>
-        <div class="comp-bar-wrap"><div class="comp-bar" style="width:${Math.round((c.count / maxC) * 100)}%"></div></div>
-        <span class="comp-count">${c.count}/${totalQ}</span>
-      </div>`).join('')
+    ? topCompetitors.map(c => {
+        const cred = c.credibility || (c.count >= 3 ? 'confirmed' : c.count >= 2 ? 'moderate' : 'unverified');
+        const credLabel = {confirmed:'Confirmed competitor', moderate:'Likely competitor', unverified:'Single mention — unverified'}[cred];
+        return `<div class="comp-row" style="margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span class="comp-name" style="width:auto">${x(c.name)}</span>
+            <span class="comp-cred ${cred}">${credLabel}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="comp-bar-wrap" style="flex:1"><div class="comp-bar" style="width:${Math.round((c.count / maxC) * 100)}%"></div></div>
+            <span class="comp-count">${c.count}/${totalQ}</span>
+          </div>
+          ${(c.promptTypes || []).length ? `<div style="margin-top:4px;font-size:11.5px;color:#9CA3AF">Appeared in: ${c.promptTypes.map(t => ptypeLabel[t]||t).join(', ')} queries</div>` : ''}
+        </div>`;
+      }).join('')
     : '<p style="color:#9CA3AF;font-size:13px">No competitor data returned for any query.</p>';
+
+  const unverifiedCount = topCompetitors.filter(c => (c.credibility || 'unverified') === 'unverified').length;
+  const confirmedComps = topCompetitors.filter(c => (c.credibility || '') === 'confirmed');
 
   // Competitor insight narrative
   let compInsightHtml = '';
   if (topCompetitors.length) {
     const top3 = topCompetitors.slice(0, 3);
     const dominantComp = top3[0];
+    const domCred = dominantComp.credibility || 'unverified';
     const insightNarrative = dominantComp.count === totalQ
-      ? dominantComp.name + ' appeared in every tested query — suggesting a highly optimised AI content strategy or strong third-party authority in this category.'
+      ? dominantComp.name + ' appeared in every tested query — strong evidence of category-leading AI visibility. Studying their content strategy is the highest-leverage action available.'
       : dominantComp.count >= totalQ * 0.6
-        ? dominantComp.name + ' appeared in ' + dominantComp.count + ' of ' + totalQ + ' queries, making them the strongest competitor in AI results. Their content strategy is likely the most instructive benchmark to study.'
-        : 'No single competitor dominates AI results — ' + top3.map(c => c.name).join(', ') + ' are the most visible brands. The category is competitive but not yet locked in, meaning well-targeted content can still establish a lead.';
+        ? dominantComp.name + ' appeared in ' + dominantComp.count + ' of ' + totalQ + ' queries, making them the most visible competitor in this category. Their website content is the benchmark to close the gap on.'
+        : confirmedComps.length === 0
+          ? 'No single competitor dominates across multiple queries — most appearances are single-query mentions that may reflect AI variability rather than genuine brand authority. Treat individual competitor names with caution until they appear consistently across future reports.'
+          : 'No single competitor dominates — ' + top3.map(c => c.name).join(', ') + ' are the most visible brands, but the category is not yet locked in. Targeted content improvements can still establish a clear lead.';
 
     compInsightHtml = `<div class="comp-insight">
-      <strong>What this tells us:</strong> ${x(insightNarrative)}
+      <strong>Reading these results:</strong> ${x(insightNarrative)}
+      ${unverifiedCount > 0 ? `<p style="margin-top:10px;font-size:13px;color:#6B7280"><em>Note: ${unverifiedCount} brand${unverifiedCount !== 1 ? 's' : ''} appeared only once across all tested queries. Single-query appearances may reflect AI variability rather than genuine competitor presence — they are flagged as "unverified" until they appear in multiple future reports.</em></p>` : ''}
       ${top3.length >= 2 ? `<div class="comp-insight-grid">
-        <div class="comp-insight-cell"><div class="comp-insight-lbl">Most visible competitor</div><div class="comp-insight-val">${x(top3[0].name)} — ${top3[0].count}/${totalQ} queries</div></div>
-        <div class="comp-insight-cell"><div class="comp-insight-lbl">Category competition level</div><div class="comp-insight-val">${topCompetitors.length >= 5 ? 'High — ' + topCompetitors.length + ' brands competing for AI placements' : topCompetitors.length >= 3 ? 'Moderate — ' + topCompetitors.length + ' brands in AI results' : 'Low — fewer than 3 brands appearing consistently'}</div></div>
+        <div class="comp-insight-cell"><div class="comp-insight-lbl">Most visible confirmed competitor</div><div class="comp-insight-val">${confirmedComps.length ? x(confirmedComps[0].name) + ' — ' + confirmedComps[0].count + '/' + totalQ + ' queries' : 'None — no competitor appeared 3+ times'}</div></div>
+        <div class="comp-insight-cell"><div class="comp-insight-lbl">Category competition level</div><div class="comp-insight-val">${confirmedComps.length >= 4 ? 'High — ' + confirmedComps.length + ' confirmed competitors' : confirmedComps.length >= 2 ? 'Moderate — ' + confirmedComps.length + ' confirmed competitors' : 'Low — fewer than 2 confirmed competitors (high-quality results only)'}</div></div>
       </div>` : ''}
     </div>`;
   }
@@ -971,11 +1160,12 @@ function renderReport(r) {
       <div class="cover-score">
         <div class="gauge-wrap">${gauge}<div class="gauge-lbl">AI Visibility Score</div></div>
         <div class="score-stats">
-          <div class="score-stat"><div class="score-stat-n">${mentionCount}/${totalQ}</div><div class="score-stat-l">queries where your brand appeared</div></div>
-          <div class="score-stat"><div class="score-stat-n">${topCompetitors.length}</div><div class="score-stat-l">competitor brands in AI results</div></div>
+          <div class="score-stat"><div class="score-stat-n">${mentionCount}/${strongResults.length}</div><div class="score-stat-l">appearances in high-quality results${scoreNote ? '' : ''}</div></div>
+          <div class="score-stat"><div class="score-stat-n">${queryResults.length}</div><div class="score-stat-l">queries tested total${poorResults.length ? ' (' + poorResults.length + ' low-quality)' : ''}</div></div>
           <div class="score-interp" style="grid-column:1/-1">${x(coverInterp)}</div>
         </div>
       </div>
+      ${deltaHtml}
     </div>
 
     <!-- EXECUTIVE SUMMARY -->
@@ -984,7 +1174,7 @@ function renderReport(r) {
         <div class="exec-tier-name">${tierLabel} Visibility</div>
         <span class="tier-badge ${tierCls}">${tierLabel}</span>
       </div>
-      <p class="exec-intro">${x(biz.name)} appeared in <strong>${mentionCount} of ${totalQ}</strong> AI queries tested, placing it in the <strong>${tierLabel}</strong> tier. ${x(opportunityText)}</p>
+      <p class="exec-intro">${x(biz.name)} appeared in <strong>${mentionCount} of ${strongResults.length} high-quality AI results</strong> tested${poorResults.length ? ' (' + poorResults.length + ' low-quality or empty AI responses were excluded from the score)' : ''}. This places it in the <strong>${tierLabel}</strong> tier. ${x(opportunityText)}</p>
       <div class="exec-grid">
         <div class="exec-cell">
           <div class="exec-cell-lbl">Biggest gap</div>
