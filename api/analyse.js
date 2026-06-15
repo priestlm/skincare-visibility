@@ -950,10 +950,25 @@ function applyGeminiResult(gemini, brandNameInput) {
   // A question passes if:
   //   (a) it doesn't use exclusive terms from a different category, AND
   //   (b) at least one meaningful content word in the question appears in evidenceTerms
+  // Build a set of the AI's own allowed_topics words for fast lookup
+  const allowedTopicWords = new Set();
+  for (const topic of allowedTopics) {
+    if (typeof topic === 'string') {
+      topic.toLowerCase().split(/[\s\/,&\-]+/).filter(w => w.length > 2).forEach(w => allowedTopicWords.add(w));
+    }
+  }
+
   function questionSupported(q) {
     const ql = q.question.toLowerCase();
-    // Only discard questions that clearly mismatch the business category
-    return !questionMismatch(ql, primaryKey);
+    // Always reject cross-category mismatches (e.g. gin question for a nut butter brand)
+    if (questionMismatch(ql, primaryKey)) return false;
+    // If the AI provided allowed_topics, check the question's evidence_term is on-topic
+    if (allowedTopicWords.size > 0 && q.evidence_term) {
+      const et = q.evidence_term.toLowerCase().trim();
+      const etWords = et.split(/[\s\/,&\-]+/).filter(w => w.length > 2);
+      if (etWords.length > 0 && !etWords.some(w => allowedTopicWords.has(w) || evidenceTerms.has(w))) return false;
+    }
+    return true;
   }
 
   const validQs = normalisedQs.filter(questionSupported);
