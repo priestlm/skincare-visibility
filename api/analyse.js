@@ -533,33 +533,19 @@ function postJson(url, payload, timeout = 12000, extraHeaders = {}) {
 }
 
 function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal) {
-  const { title, metaDesc, ogTitle, ogDesc, headings, navLinks, bodyText } = extracted;
-  const isBlocked = analysisStatus === 'blocked' || analysisStatus === 'failed';
-
   const ddgBlock = ddgSignal ? [
-    ddgSignal.heading ? `Brand: ${ddgSignal.heading}` : '',
-    ddgSignal.entity  ? `Entity type: ${ddgSignal.entity}` : '',
-    ddgSignal.abstract ? `DuckDuckGo summary: ${ddgSignal.abstract}` : '',
-    ddgSignal.infobox.length ? `Key facts: ${ddgSignal.infobox.join(' | ')}` : '',
-    ddgSignal.topics.length  ? `Related topics: ${ddgSignal.topics.slice(0, 4).join(' | ')}` : '',
+    ddgSignal.heading  ? `Brand: ${ddgSignal.heading}` : '',
+    ddgSignal.entity   ? `Entity type: ${ddgSignal.entity}` : '',
+    ddgSignal.abstract ? `Overview: ${ddgSignal.abstract}` : '',
+    ddgSignal.infobox && ddgSignal.infobox.length ? `Key facts: ${ddgSignal.infobox.join(' | ')}` : '',
+    ddgSignal.topics && ddgSignal.topics.length   ? `Related topics: ${ddgSignal.topics.slice(0, 4).join(' | ')}` : '',
   ].filter(Boolean).join('\n') : '';
 
-  const siteBlock = isBlocked
-    ? `Note: Website blocked automated access — use DuckDuckGo data above as primary signal.\nURL: ${targetUrl}`
-    : [
-      `URL: ${targetUrl}`,
-      title       ? `Page title: ${title}` : '',
-      ogTitle     ? `OG title: ${ogTitle}` : '',
-      metaDesc    ? `Meta description: ${metaDesc}` : '',
-      ogDesc      ? `OG description: ${ogDesc}` : '',
-      headings.length ? `Headings: ${headings.slice(0, 8).join(' | ')}` : '',
-      navLinks.length ? `Navigation links: ${navLinks.slice(0, 20).join(', ')}` : '',
-      bodyText    ? `Body text snippet: ${bodyText.slice(0, 800)}` : '',
-    ].filter(Boolean).join('\n');
+  const signalsBlock = ddgBlock
+    ? `URL: ${targetUrl}\n\n${ddgBlock}`
+    : `URL: ${targetUrl}\nNo external data found — use your training knowledge about this brand.`;
 
-  const signalsBlock = [ddgBlock, siteBlock].filter(Boolean).join('\n\n');
-
-  return `Analyse the website signals below. Return ONLY a valid JSON object — no markdown, no fences. Keep all string values under 25 words.
+  return `You are a brand analyst. Analyse the brand signals below and return ONLY a valid JSON object — no markdown, no code fences, no explanation. Keep all string values under 25 words.
 
 {
   “organisation_name”: “trading name only”,
@@ -567,13 +553,12 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal) {
   “business_summary”: “2-3 sentences in your own words”,
   “primary_category”: “one exact value from the category list”,
   “secondary_categories”: [],
-  “detected_niche”: “specific sub-type e.g. Cornish cask ale brewery — empty if none”,
+  “detected_niche”: “specific sub-type e.g. nut butter brand — empty if none”,
   “products_or_services_found”: [{“category”: “label”, “examples”: [“product 1”, “product 2”]}],
-  “customer_channels”: [{“channel”: “e.g. Direct ecommerce / Pub supply”, “reason”: “one sentence”}],
+  “customer_channels”: [{“channel”: “e.g. Direct ecommerce / Supermarket retail”, “reason”: “one sentence”}],
   “public_signals”: [“award”, “heritage”, “location”, “years trading”],
-  “market_or_location_signals”: “e.g. Cornwall UK — empty if none”,
-  “allowed_topics”: [“topics from products/channels/signals only — questions must use ONLY these”],
-  “likely_search_intents”: [“8 real customer needs: who is searching and why, e.g. 'dad buying a beer gift', 'bar manager finding local stock'”],
+  “market_or_location_signals”: “e.g. UK — empty if none”,
+  “allowed_topics”: [“list every product type, ingredient, format, occasion this brand is relevant to”],
   “example_ai_shopping_questions”: [
     {
       “question”: “natural sentence as typed to ChatGPT — casual plain English, real-life detail”,
@@ -587,31 +572,29 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal) {
 }
 
 RULES:
-1. Classify from evidence. Brewery → “Food & drink”. Skincare → “Beauty & skincare”.
-2. allowed_topics: ONLY topics found in the signals. Nothing invented.
+1. Use the signals below AND your own training knowledge about this brand to fill every field.
+2. allowed_topics: include every product, format, ingredient, occasion, lifestyle angle relevant to this brand. Be generous — this drives question variety.
 3. Questions must sound like a real person talking to ChatGPT — casual, plain English, not marketing copy.
-   FORBIDDEN WORDS: award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, bespoke, curated, hospitality supplier. Also forbidden: business name, brand name, “you”, “your”.
-   GOOD: “I'm looking for a local brewery in Cornwall that sells to pubs — any recommendations?” / “where can I get Cornish beer delivered?” / “what's a good brewery near Truro to visit for a day out?”
-   BAD: “find me award-winning cask ales” / “recommend an independent brewery that supplies pubs wholesale”
-4. Each question must use a term from allowed_topics. evidence_term must be in allowed_topics. If website was blocked, use your knowledge of the brand to populate allowed_topics and generate questions freely.
-5. Do NOT write questions about categories not in products_or_services_found.
-6. confidence_score: 0.6-0.75 if website blocked.
-7. Generate AT LEAST 20 questions spread across the prompt_type categories. Minimum per type: discovery(4), location(2), specific_product(3), comparison(3), occasion(2), gift(2), awareness(2), trade(1 if B2B signals exist else omit). More questions = better coverage. Aim for 22-25.
-8. visibility_gaps: be specific — name actual product types, page types, or information the AI would need. Not “add more content” — say “no dedicated page for gluten-free nut butters” or “delivery postcodes not listed anywhere on site”.
+   FORBIDDEN WORDS: award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, bespoke, curated. Also forbidden: business name, brand name, “you”, “your”.
+   GOOD: “what's the best nut butter for smoothies?” / “where can I buy almond butter online in the UK?” / “is almond butter good for weight loss?”
+   BAD: “find me award-winning nut butters” / “recommend a premium natural nut butter brand”
+4. Do NOT write questions about categories not relevant to this brand.
+5. Generate AT LEAST 20 questions. Spread across: discovery(4+), specific_product(4+), comparison(3+), occasion(2+), gift(2+), awareness(2+), location(2+). Aim for 22-25.
+6. visibility_gaps: name actual product types, page types, or information a buyer would want. Not “add more content” — say “no page for allergen information” or “no UK stockist map”.
 
 prompt_type definitions:
-- discovery: “what's a good X for Y” or “best X for someone who Z” — category exploration
+- discovery: “what's a good X for Y” or “best X for someone who Z”
 - location: “X near me”, “X that delivers to [place]”, “where can I get X in [region]”
 - comparison: “X vs Y”, “is X better than Z”, “alternatives to [brand type]”
 - occasion: “X for [event/occasion]”, “X for [season/holiday]”
-- gift: “gift for someone who likes X”, “birthday/Christmas gift idea for X fan”
+- gift: “gift for someone who likes X”, “birthday/Christmas gift idea”
 - specific_product: query about a particular product type the business sells
 - awareness: “who sells X”, “where can I buy X online”, “where does X ship”
-- trade: “supplier of X for restaurants/bars/gyms”, “wholesale X” — only if B2B signals exist
+- trade: only if clear B2B signals exist
 
 Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
 
-Website signals:
+Brand signals:
 ${signalsBlock}`;
 }
 
@@ -680,9 +663,13 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, t
       return { _error: `${providerName.toLowerCase()}_status_${result.status}` };
     }
     const text = result.body?.choices?.[0]?.message?.content || '';
+    // Strip markdown fences then find the first JSON object
     const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-    if (!parsed.primary_category || !parsed.example_ai_shopping_questions) {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) { console.error(`${providerName} no JSON found`); return { _error: `${providerName.toLowerCase()}_no_json` }; }
+    const parsed = JSON.parse(match[0]);
+    if (!parsed.primary_category) {
+      console.error(`${providerName} missing primary_category`);
       return { _error: `${providerName.toLowerCase()}_missing_fields` };
     }
     console.log(`${providerName} succeeded`);
