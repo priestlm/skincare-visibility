@@ -507,7 +507,7 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus) {
   const isBlocked = analysisStatus === 'blocked' || analysisStatus === 'failed';
 
   const signalsBlock = isBlocked
-    ? `Note: The website blocked automated access. Only the URL/domain is available as a signal.\nURL: ${targetUrl}`
+    ? `Note: The website blocked automated access. Use your training knowledge of this brand to answer.\nURL: ${targetUrl}\nInfer category, products, and questions from the brand name and domain alone. Still generate AT LEAST 20 questions.`
     : [
       `URL: ${targetUrl}`,
       title       ? `Page title: ${title}` : '',
@@ -553,7 +553,7 @@ RULES:
    FORBIDDEN WORDS: award-winning, premium, artisan, renowned, finest, wholesaler, on-trade, bespoke, curated, hospitality supplier. Also forbidden: business name, brand name, “you”, “your”.
    GOOD: “I'm looking for a local brewery in Cornwall that sells to pubs — any recommendations?” / “where can I get Cornish beer delivered?” / “what's a good brewery near Truro to visit for a day out?”
    BAD: “find me award-winning cask ales” / “recommend an independent brewery that supplies pubs wholesale”
-4. Each question must use a term from allowed_topics. evidence_term must be in allowed_topics. Omit rather than invent.
+4. Each question must use a term from allowed_topics. evidence_term must be in allowed_topics. If website was blocked, use your knowledge of the brand to populate allowed_topics and generate questions freely.
 5. Do NOT write questions about categories not in products_or_services_found.
 6. confidence_score: 0.6-0.75 if website blocked.
 7. Generate AT LEAST 20 questions spread across the prompt_type categories. Minimum per type: discovery(4), location(2), specific_product(3), comparison(3), occasion(2), gift(2), awareness(2), trade(1 if B2B signals exist else omit). More questions = better coverage. Aim for 22-25.
@@ -1020,18 +1020,14 @@ function detectNicheFromText(extracted) {
 function buildQuestions(categories, niche) {
   const seen = new Set();
   const out = [];
-  // Niche questions first if available
   if (niche) {
     for (const q of (NICHE_QUESTIONS[niche] || [])) {
-      if (!seen.has(q) && out.length < 5) { seen.add(q); out.push(q); }
+      if (!seen.has(q)) { seen.add(q); out.push(q); }
     }
   }
-  if (out.length < 5) {
-    for (const cat of categories) {
-      for (const q of (QUESTIONS[cat] || [])) {
-        if (!seen.has(q) && out.length < 5) { seen.add(q); out.push(q); }
-      }
-      if (out.length >= 5) break;
+  for (const cat of categories) {
+    for (const q of (QUESTIONS[cat] || [])) {
+      if (!seen.has(q)) { seen.add(q); out.push(q); }
     }
   }
   return out;
