@@ -1174,170 +1174,54 @@ module.exports = async (req, res) => {
   // Domain override
   const override = matchDomainOverride(targetUrl);
 
-  let extracted = { title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' };
-  let fetchedOk = false;
-  let analysisStatus = 'ok'; // ok | blocked | failed
-  let ddgSignal = null;
+  const extracted = { title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' };
+  const fetchedOk = false;
+  const analysisStatus = 'ok';
 
-  // Always query DuckDuckGo — runs in parallel with site scrape
+  // DuckDuckGo is the sole brand research source — no site scraping
   const ddgQuery = (brandName || '') + (brandName ? ' brand products UK' : new URL(targetUrl).hostname.replace(/^www\./, '') + ' brand UK');
-  const [ddgResult, htmlResult] = await Promise.allSettled([
-    fetchDuckDuckGo(ddgQuery),
-    override ? Promise.resolve(null) : fetchHtml(targetUrl),
-  ]);
+  const ddgSignal = await fetchDuckDuckGo(ddgQuery);
 
-  ddgSignal = ddgResult.status === 'fulfilled' ? ddgResult.value : null;
+  if (override && override.summary) extracted.metaDesc = override.summary;
 
-  if (!override) {
-    try {
-      const html = htmlResult.status === 'fulfilled' ? htmlResult.value : null;
-      if (!html) throw new Error('fetch failed');
-      extracted = extract(html);
-      if (isBlockedPage(extracted)) {
-        analysisStatus = 'blocked';
-      } else {
-        fetchedOk = !!(extracted.title || extracted.metaDesc || extracted.headings.length > 0);
-        if (!fetchedOk) analysisStatus = 'failed';
-      }
-    } catch {
-      analysisStatus = 'failed';
-    }
-  } else {
-    fetchedOk = true;
-    if (override.summary) extracted.metaDesc = override.summary;
-  }
+  // Call AI with DDG signal — no site scraping
+  const aiRaw = await callAI(extracted, targetUrl, 'ok', ddgSignal);
+  const ai = aiRaw && !aiRaw._error ? aiRaw : null;
 
-  // Domain override always wins â€” even if scraping was blocked
-  if (override) {
-    analysisStatus = 'ok';
-    fetchedOk = true;
-  }
-
-  // No override and blocked/failed â†' try Gemini with domain-only signal, else ask user
-  if (!override && (analysisStatus === 'blocked' || analysisStatus === 'failed')) {
-    const geminiRaw = await callAI(extracted, targetUrl, analysisStatus, ddgSignal);
-    const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
-    if (gemini) {
-      const mapped = applyGeminiResult(gemini, brandName);
-      const { primaryKey, categories, questions, questionsRich, weakEvidence, brandName: aiBrand, organisationName, summary, customerType, detectedNiche, productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
-      const riskNarrative = buildRiskNarrative(aiBrand || brandName, primaryKey, categories);
-      const categoryLabels = categories.map(c => ({
-        key: c, label: CATEGORY_DEFS[c]?.label || c, primary: c === primaryKey,
-      }));
-      return res.status(200).json({
-        fetchedOk: false, needsManualCategory: false,
-        analysis_status: analysisStatus, aiAssisted: true, geminiKeyPresent: true, manual: false,
-        title: organisationName || aiBrand || brandName || targetUrl,
-        organisationName: organisationName || aiBrand || brandName || targetUrl,
-        summary, primary: primaryKey, niche: detectedNiche || null,
-        productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps,
-        locationSignals: locationSignals || null, categories: categoryLabels,
-        customerType, questions, questionsRich, weakEvidence: weakEvidence || false, riskNarrative,
-        confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes,
-      });
-    }
-    // No Gemini key or Gemini failed â€” ask user to pick category manually
+  if (!ai) {
     return res.status(200).json({
-      fetchedOk: false,
-      needsManualCategory: true,
-      aiAssisted: false,
-      geminiKeyPresent: !!process.env.GEMINI_API_KEY,
-      geminiError: geminiRaw?._error || null,
-      analysis_status: analysisStatus,
-      title: '',
-      summary: '',
-      categories: [],
-      primary: null,
-      questions: [],
-      riskNarrative: '',
+      fetchedOk: false, needsManualCategory: true, aiAssisted: false,
+      aiError: aiRaw?._error || 'ai_failed',
+      analysis_status: 'failed',
+      title: brandName || targetUrl, summary: '', categories: [], primary: null, questions: [], riskNarrative: '',
     });
   }
 
-  // â”€â”€ Classify: try Gemini first, fall back to rules-based â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  let primary, categories, summary, questions, questionsRich = [], customerType, aiAssisted = false;
-  let aiExtras = {}, weakEvidence = false;
-  let detectedNiche = null, productsFound = [], productsStructured = [];
-  let customerChannels = [], publicSignals = [], visibilityGaps = [];
-  let organisationName = '', locationSignals = null;
+  const mapped = applyGeminiResult(ai, brandName || '');
+  const { primaryKey: primary, categories, questions, questionsRich, weakEvidence,
+    brandName: aiBrand, organisationName, summary, customerType,
+    detectedNiche, productsFound, productsStructured,
+    customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
 
-  if (override) {
-    ({ primary, categories } = override);
-    const geminiRaw = await callAI(extracted, targetUrl, 'ok', ddgSignal);
-    const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
-    if (gemini) {
-      const mapped = applyGeminiResult(gemini, brandName || extracted.title);
-      questions = mapped.questions; questionsRich = mapped.questionsRich; weakEvidence = mapped.weakEvidence || false;
-      summary = mapped.summary || buildSummary(extracted, brandName || extracted.title);
-      customerType = mapped.customerType; detectedNiche = mapped.detectedNiche || null;
-      productsFound = mapped.productsFound || []; productsStructured = mapped.productsStructured || [];
-      customerChannels = mapped.customerChannels || []; publicSignals = mapped.publicSignals || [];
-      visibilityGaps = mapped.visibilityGaps || [];
-      organisationName = mapped.organisationName || mapped.brandName || '';
-      locationSignals = mapped.locationSignals || null;
-      aiAssisted = true;
-      aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
-    } else {
-      // AI failed for domain override — cannot generate brand-specific questions
-      return res.status(200).json({
-        fetchedOk: false, needsManualCategory: true, aiAssisted: false,
-        geminiKeyPresent: !!process.env.GEMINI_API_KEY,
-        geminiError: geminiRaw?._error || 'ai_failed',
-        analysis_status: 'failed',
-        title: brandName || targetUrl, summary: '', categories: [], primary: null, questions: [], riskNarrative: '',
-      });
-    }
-  } else {
-    const geminiRaw = await callAI(extracted, targetUrl, analysisStatus, ddgSignal);
-    const gemini = geminiRaw && !geminiRaw._error ? geminiRaw : null;
-    if (gemini) {
-      const mapped = applyGeminiResult(gemini, brandName || extracted.title);
-      primary = mapped.primaryKey; categories = mapped.categories;
-      questions = mapped.questions; questionsRich = mapped.questionsRich; weakEvidence = mapped.weakEvidence || false;
-      summary = mapped.summary || buildSummary(extracted, brandName || extracted.title);
-      customerType = mapped.customerType; detectedNiche = mapped.detectedNiche || null;
-      productsFound = mapped.productsFound || []; productsStructured = mapped.productsStructured || [];
-      customerChannels = mapped.customerChannels || []; publicSignals = mapped.publicSignals || [];
-      visibilityGaps = mapped.visibilityGaps || [];
-      organisationName = mapped.organisationName || mapped.brandName || '';
-      locationSignals = mapped.locationSignals || null;
-      aiAssisted = true;
-      aiExtras = { confidence: gemini.confidence_score, analysisNotes: gemini.analysis_notes };
-    } else {
-      // AI failed — cannot generate brand-specific questions, return error rather than generic templates
-      return res.status(200).json({
-        fetchedOk, needsManualCategory: true, aiAssisted: false,
-        geminiKeyPresent: !!process.env.GEMINI_API_KEY,
-        geminiError: geminiRaw?._error || 'ai_failed',
-        analysis_status: analysisStatus,
-        title: brandName || extracted.title || targetUrl, summary: '', categories: [], primary: null, questions: [], riskNarrative: '',
-      });
-    }
-  }
-
-  const displayTitle = organisationName || brandName || extracted.title || extracted.ogTitle || '';
+  const displayTitle = organisationName || aiBrand || brandName || targetUrl;
   const riskNarrative = buildRiskNarrative(displayTitle, primary, categories);
   const categoryLabels = categories.map(c => ({
     key: c, label: CATEGORY_DEFS[c]?.label || c, primary: c === primary,
   }));
 
   const responseData = {
-    fetchedOk, needsManualCategory: false, analysis_status: analysisStatus,
-    aiAssisted, manual: false,
-    title: displayTitle, ogTitle: extracted.ogTitle, metaDescription: extracted.metaDesc,
-    organisationName: organisationName || null, summary,
+    fetchedOk: false, needsManualCategory: false, analysis_status: 'ok',
+    aiAssisted: true, manual: false,
+    title: displayTitle, organisationName: organisationName || null, summary,
     primary, niche: detectedNiche || null,
     productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps,
     locationSignals: locationSignals || null,
     categories: categoryLabels, customerType,
     questions, questionsRich, weakEvidence, riskNarrative,
-    geminiKeyPresent: !!process.env.GEMINI_API_KEY,
-    ...aiExtras,
+    confidence: ai.confidence_score,
   };
 
-  // Cache successful AI-assisted results to avoid redundant Gemini calls
-  if (aiAssisted && !weakEvidence) {
-    cacheSet(cacheKey, responseData);
-  }
+  if (!weakEvidence) cacheSet(cacheKey, responseData);
 
   res.status(200).json(responseData);
 };
