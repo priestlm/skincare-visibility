@@ -216,6 +216,54 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
 .rpt-footer-logo{display:flex;align-items:center;gap:6px;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#374151}
 .rpt-footer-logo .logo-icon{width:20px;height:20px;border-radius:5px}
 
+/* ── Executive Q&A section ── */
+.exec-qa{display:flex;flex-direction:column;gap:0;margin-top:20px}
+.exec-qa-row{display:grid;grid-template-columns:220px 1fr;gap:0;border-bottom:1px solid #E5E7EB;padding:14px 0}
+.exec-qa-row:first-child{padding-top:0}
+.exec-qa-row:last-child{border-bottom:none;padding-bottom:0}
+.exec-qa-q{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:#9CA3AF;padding-right:20px;line-height:1.5;padding-top:2px}
+.exec-qa-a{font-size:14px;color:#111827;font-weight:500;line-height:1.6}
+.exec-qa-a .sub{font-size:13px;color:#6B7280;font-weight:400;margin-top:3px}
+
+/* ── Visibility snapshot (3-column) ── */
+.snap-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#E5E7EB;border-radius:12px;overflow:hidden;margin-top:4px}
+.snap-col{background:#fff;padding:0}
+.snap-col-head{padding:12px 16px;border-bottom:1px solid #F3F4F6;display:flex;align-items:center;justify-content:space-between}
+.snap-col-title{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.snap-col-head.appeared .snap-col-title{color:#059669}
+.snap-col-head.missed .snap-col-title{color:#DC2626}
+.snap-col-head.uncertain .snap-col-title{color:#9CA3AF}
+.snap-col-count{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700}
+.snap-col-count.appeared{color:#059669}
+.snap-col-count.missed{color:#DC2626}
+.snap-col-count.uncertain{color:#9CA3AF}
+.snap-items{padding:8px 0}
+.snap-item{padding:9px 16px;border-bottom:1px solid #F9FAFB;font-size:12.5px;line-height:1.45}
+.snap-item:last-child{border-bottom:none}
+.snap-item-q{color:#1F2937;margin-bottom:3px;font-style:italic}
+.snap-item-sub{color:#9CA3AF;font-size:11.5px;font-family:'JetBrains Mono',monospace}
+.snap-item-sub.comp{color:#6366F1}
+.snap-item-sub.reason{color:#D97706}
+
+/* ── Appendix toggle ── */
+.appendix-toggle{display:flex;align-items:center;gap:10px;padding:14px 56px;border-top:2px solid #E5E7EB;background:#F9FAFB;cursor:pointer;font-size:13.5px;color:#4B5563;font-weight:500;transition:background .15s;user-select:none}
+.appendix-toggle:hover{background:#F3F4F6}
+.appendix-toggle-icon{font-size:12px;transition:transform .2s;flex:none}
+.appendix-toggle-icon.open{transform:rotate(90deg)}
+.appendix-section{display:none;border-top:1px solid #E5E7EB}
+.appendix-label{padding:20px 56px 8px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#9CA3AF}
+
+/* ── Competitor table ── */
+.comp-table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+.comp-table th{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#9CA3AF;padding:8px 12px;text-align:left;border-bottom:1px solid #F3F4F6;font-weight:600}
+.comp-table td{padding:10px 12px;border-bottom:1px solid #F9FAFB;vertical-align:top}
+.comp-table tr:last-child td{border-bottom:none}
+.comp-table .comp-n{font-weight:600;color:#1F2937}
+.comp-table .comp-freq{font-family:'JetBrains Mono',monospace;font-size:12px;color:#6B7280;white-space:nowrap}
+.comp-table .comp-types{font-size:12px;color:#6B7280}
+.comp-tier-head{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;padding:12px 12px 6px;color:#6B7280;font-weight:700;background:#F9FAFB;border-top:1px solid #E5E7EB;border-bottom:1px solid #F3F4F6}
+.comp-caveat{margin-top:14px;padding:12px 16px;background:#FFFBEB;border-radius:8px;border:1px solid #FDE68A;font-size:13px;color:#92400E;line-height:1.6}
+
 /* ── Confidence & quality badges ── */
 .conf-badge{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;font-weight:700;padding:3px 8px;border-radius:4px;text-transform:uppercase;white-space:nowrap;flex:none}
 .conf-badge.high{background:#ECFDF5;color:#059669;border:1px solid #6EE7B7}
@@ -608,7 +656,8 @@ async function generateReport() {
         batch.map(q => fetchQuery(q.question, q.intent, q.promptType, orgName))
       );
 
-      for (const res of settled) {
+      settled.forEach((res, j) => {
+        const q = batch[j];
         if (res.status === 'fulfilled') {
           const qd = res.value;
           if (qd.businessMentioned) mentionCount++;
@@ -624,7 +673,6 @@ async function generateReport() {
           });
           qResults.push(qd);
         } else {
-          const q = batch[qResults.length - (i) < batch.length ? qResults.length - i : 0] || {question: '', intent: '', promptType: 'discovery'};
           qResults.push({question: q.question, intent: q.intent, promptType: q.promptType, recommendations: [], businessMentioned: false, recCount: 0, quality: 'empty', error: true});
         }
         doneCount++;
@@ -632,7 +680,7 @@ async function generateReport() {
         const pb = document.getElementById('gen-pb');
         if (pb) pb.style.width = pct + '%';
         setStep('query', 'active', doneCount + '/' + totalQ + ' queries complete');
-      }
+      });
     }
 
     setStep('query', 'done', mentionCount + '/' + totalQ + ' queries — brand appeared');
@@ -1137,6 +1185,95 @@ function renderReport(r) {
   nextCheckDate.setDate(nextCheckDate.getDate() + 30);
   const nextCheckStr = nextCheckDate.toLocaleDateString('en-GB', {day: 'numeric', month: 'long', year: 'numeric'});
 
+  // ── Pre-compute snapshot categories ──
+  const appearedResults = queryResults.filter(q => !q.error && q.businessMentioned && q.quality !== 'empty');
+  const missedResults = queryResults.filter(q => !q.error && !q.businessMentioned && (q.quality === 'strong' || q.quality === 'moderate'));
+  const uncertainResults = queryResults.filter(q => q.error || q.quality === 'empty' || q.quality === 'thin');
+
+  // Prompt types distribution for exec summary
+  const appearedByType = {};
+  appearedResults.forEach(q => { const t = ptypeLabel[q.promptType] || q.promptType; appearedByType[t] = (appearedByType[t] || 0) + 1; });
+  const missedByType = {};
+  missedResults.forEach(q => { const t = ptypeLabel[q.promptType] || q.promptType; missedByType[t] = (missedByType[t] || 0) + 1; });
+  const appearedTypeStr = Object.entries(appearedByType).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([t])=>t).join(', ') || 'various';
+  const missedTypeStr = Object.entries(missedByType).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([t])=>t).join(', ') || 'various';
+
+  // Exec Q&A answers
+  const visibilityAnswer = appearedResults.length === 0
+    ? 'No — ' + biz.name + ' did not appear in any of the ' + strongResults.length + ' reliable AI results tested.'
+    : appearedResults.length === strongResults.length
+      ? 'Yes — ' + biz.name + ' appeared in all ' + strongResults.length + ' reliable results. Focus on maintaining this position.'
+      : 'Sometimes — appearing in ' + appearedResults.length + ' of ' + strongResults.length + ' reliable results (' + tierLabel + ' visibility).';
+  const visibilityAnswerSub = appearedResults.length > 0 && appearedResults.length < strongResults.length
+    ? 'Visible for: ' + appearedTypeStr + ' queries. Missing for: ' + missedTypeStr + ' queries.'
+    : appearedResults.length === 0 ? 'All tested query types returned competitors or no result.' : '';
+
+  const confirmedComps = topCompetitors.filter(c => (c.credibility || 'unverified') === 'confirmed');
+  const competitorAnswer = confirmedComps.length
+    ? confirmedComps.slice(0,3).map(c => c.name + ' (' + c.count + '/' + totalQ + ')').join(', ')
+    : topCompetitors.length
+      ? topCompetitors.slice(0,3).map(c => c.name).join(', ') + ' — though none appeared consistently enough to confirm'
+      : 'No consistent competitor pattern detected across these queries.';
+  const competitorSub = confirmedComps.length
+    ? 'Auditing ' + confirmedComps[0].name + '\'s website content is the most actionable competitive intelligence step.'
+    : topCompetitors.length ? 'Single-query appearances may reflect AI variability — treat these as indicative only.' : '';
+
+  const holdingBackAnswer = visibilityGaps && visibilityGaps.length ? visibilityGaps[0] : 'Website content does not clearly address the buyer questions AI assistants are being asked.';
+  const holdingBackSub = visibilityGaps && visibilityGaps.length > 1 ? visibilityGaps[1] : '';
+
+  const topAction = recommendations.length ? recommendations[0] : null;
+  const actionAnswer = topAction ? topAction.title : 'Review the Priority Actions section below.';
+  const actionSub = topAction ? topAction.what : '';
+
+  // ── Visibility snapshot HTML ──
+  const bl = biz.name.toLowerCase();
+  const snapAppearedHtml = appearedResults.map(q => {
+    const compsThere = (q.recommendations || []).filter(r => { const rl=(r.name||'').toLowerCase(); return !rl.includes(bl)&&!bl.includes(rl); }).slice(0,2).map(r=>r.name).join(', ');
+    return `<div class="snap-item">
+      <div class="snap-item-q">"${x(q.question.length > 70 ? q.question.slice(0,70)+'…' : q.question)}"</div>
+      ${compsThere ? `<div class="snap-item-sub">Also: ${x(compsThere)}</div>` : '<div class="snap-item-sub" style="color:#059669">Only brand recommended</div>'}
+    </div>`;
+  }).join('') || '<div class="snap-item"><div class="snap-item-q" style="color:#9CA3AF;font-style:normal">No appearances in reliable results</div></div>';
+
+  const snapMissedHtml = missedResults.map(q => {
+    const winners = (q.recommendations || []).filter(r => { const rl=(r.name||'').toLowerCase(); return !rl.includes(bl)&&!bl.includes(rl); }).slice(0,2).map(r=>r.name).join(', ');
+    return `<div class="snap-item">
+      <div class="snap-item-q">"${x(q.question.length > 70 ? q.question.slice(0,70)+'…' : q.question)}"</div>
+      ${winners ? `<div class="snap-item-sub comp">→ ${x(winners)}</div>` : '<div class="snap-item-sub">No brand recommended</div>'}
+    </div>`;
+  }).join('') || '<div class="snap-item"><div class="snap-item-q" style="color:#9CA3AF;font-style:normal">No missed queries</div></div>';
+
+  const snapUncertainHtml = uncertainResults.map(q => {
+    const reason = q.error ? 'API error' : q.quality === 'empty' ? 'No AI recommendations returned' : 'Only 1 recommendation returned — low confidence';
+    return `<div class="snap-item">
+      <div class="snap-item-q">"${x(q.question ? (q.question.length > 70 ? q.question.slice(0,70)+'…' : q.question) : 'Unknown query')}"</div>
+      <div class="snap-item-sub reason">${reason}</div>
+    </div>`;
+  }).join('') || '<div class="snap-item"><div class="snap-item-q" style="color:#9CA3AF;font-style:normal">All results were reliable</div></div>';
+
+  // ── Competitor intelligence table ──
+  const compTiers = {confirmed: [], moderate: [], unverified: []};
+  topCompetitors.forEach(c => { const t = c.credibility || 'unverified'; (compTiers[t] = compTiers[t] || []).push(c); });
+
+  function compRows(comps) {
+    return comps.map(c => `<tr>
+      <td class="comp-n">${x(c.name)}</td>
+      <td class="comp-freq">${c.count}/${totalQ} queries</td>
+      <td class="comp-types">${(c.promptTypes || []).map(t => ptypeLabel[t]||t).join(', ') || '—'}</td>
+    </tr>`).join('');
+  }
+
+  const compTableHtml = topCompetitors.length ? `<table class="comp-table">
+    <thead><tr><th>Brand</th><th>Appearances</th><th>Query types</th></tr></thead>
+    <tbody>
+      ${compTiers.confirmed.length ? `<tr><td colspan="3" class="comp-tier-head">Confirmed competitors — appeared 3 or more times</td></tr>${compRows(compTiers.confirmed)}` : ''}
+      ${compTiers.moderate.length ? `<tr><td colspan="3" class="comp-tier-head">Probable competitors — appeared twice</td></tr>${compRows(compTiers.moderate)}` : ''}
+      ${compTiers.unverified.length ? `<tr><td colspan="3" class="comp-tier-head">Single mentions — appeared once (may be AI variability)</td></tr>${compRows(compTiers.unverified)}` : ''}
+    </tbody>
+  </table>
+  ${compTiers.unverified.length > 0 ? `<div class="comp-caveat">⚠ Single-mention brands should not be treated as confirmed competitors. AI models can surface different brands across queries and sessions. A brand only becomes a reliable competitor signal when it appears consistently across multiple queries in multiple monthly reports.</div>` : ''}
+  ${compInsightHtml}` : '<p style="color:#9CA3AF;font-size:13px">No competitor data returned — all queries produced empty or error responses.</p>';
+
   document.getElementById('rpt-out').innerHTML = `<div class="rpt-doc">
 
     <!-- COVER -->
@@ -1154,14 +1291,14 @@ function renderReport(r) {
         <div class="cover-meta"><span class="cover-meta-lbl">Market</span><span class="cover-meta-val">${x(biz.market)}</span></div>
         <div class="cover-meta"><span class="cover-meta-lbl">Category</span><span class="cover-meta-val">${x(biz.category || 'Unknown')}</span></div>
         ${biz.niche ? `<div class="cover-meta"><span class="cover-meta-lbl">Niche</span><span class="cover-meta-val">${x(biz.niche)}</span></div>` : ''}
-        <div class="cover-meta"><span class="cover-meta-lbl">Queries tested</span><span class="cover-meta-val">${totalQ}</span></div>
+        <div class="cover-meta"><span class="cover-meta-lbl">Queries tested</span><span class="cover-meta-val">${queryResults.length} (${strongResults.length} reliable)</span></div>
         <div class="cover-meta"><span class="cover-meta-lbl">Report ID</span><span class="cover-meta-val" style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.id}</span></div>
       </div>
       <div class="cover-score">
         <div class="gauge-wrap">${gauge}<div class="gauge-lbl">AI Visibility Score</div></div>
         <div class="score-stats">
-          <div class="score-stat"><div class="score-stat-n">${mentionCount}/${strongResults.length}</div><div class="score-stat-l">appearances in high-quality results${scoreNote ? '' : ''}</div></div>
-          <div class="score-stat"><div class="score-stat-n">${queryResults.length}</div><div class="score-stat-l">queries tested total${poorResults.length ? ' (' + poorResults.length + ' low-quality)' : ''}</div></div>
+          <div class="score-stat"><div class="score-stat-n">${mentionCount}/${strongResults.length}</div><div class="score-stat-l">appearances in reliable results</div></div>
+          <div class="score-stat"><div class="score-stat-n">${uncertainResults.length}</div><div class="score-stat-l">uncertain / excluded results</div></div>
           <div class="score-interp" style="grid-column:1/-1">${x(coverInterp)}</div>
         </div>
       </div>
@@ -1174,19 +1311,22 @@ function renderReport(r) {
         <div class="exec-tier-name">${tierLabel} Visibility</div>
         <span class="tier-badge ${tierCls}">${tierLabel}</span>
       </div>
-      <p class="exec-intro">${x(biz.name)} appeared in <strong>${mentionCount} of ${strongResults.length} high-quality AI results</strong> tested${poorResults.length ? ' (' + poorResults.length + ' low-quality or empty AI responses were excluded from the score)' : ''}. This places it in the <strong>${tierLabel}</strong> tier. ${x(opportunityText)}</p>
-      <div class="exec-grid">
-        <div class="exec-cell">
-          <div class="exec-cell-lbl">Biggest gap</div>
-          <div class="exec-cell-val">${x(gapText)}</div>
+      <div class="exec-qa">
+        <div class="exec-qa-row">
+          <div class="exec-qa-q">Is ${x(biz.name)} appearing in AI recommendations?</div>
+          <div class="exec-qa-a">${x(visibilityAnswer)}${visibilityAnswerSub ? `<div class="sub">${x(visibilityAnswerSub)}</div>` : ''}</div>
         </div>
-        <div class="exec-cell ${topComp ? '' : 'highlight'}">
-          <div class="exec-cell-lbl">Strongest competitor</div>
-          <div class="exec-cell-val">${topComp ? x(topComp.name) + ' — appeared in ' + topComp.count + '/' + totalQ + ' queries' : 'No strong competitor dominance detected'}</div>
+        <div class="exec-qa-row">
+          <div class="exec-qa-q">Who is winning the queries we're missing?</div>
+          <div class="exec-qa-a">${x(competitorAnswer)}${competitorSub ? `<div class="sub">${x(competitorSub)}</div>` : ''}</div>
         </div>
-        <div class="exec-cell action-highlight">
-          <div class="exec-cell-lbl">Top priority action</div>
-          <div class="exec-cell-val">${x(topActionText)}</div>
+        <div class="exec-qa-row">
+          <div class="exec-qa-q">What's holding the brand back?</div>
+          <div class="exec-qa-a">${x(holdingBackAnswer)}${holdingBackSub ? `<div class="sub">${x(holdingBackSub)}</div>` : ''}</div>
+        </div>
+        <div class="exec-qa-row">
+          <div class="exec-qa-q">What should we do this month?</div>
+          <div class="exec-qa-a">${x(actionAnswer)}${actionSub ? `<div class="sub">${x(actionSub)}</div>` : ''}</div>
         </div>
       </div>
     </div>
@@ -1199,91 +1339,126 @@ function renderReport(r) {
         <div>
           <div class="profile-block-lbl">Category &amp; Niche</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">${catTags || nicheTags || '<span style="color:#9CA3AF;font-size:13px">Not detected</span>'}</div>
-          <div class="profile-block-lbl">Location / Market Signals</div>
+          <div class="profile-block-lbl">Location / Market</div>
           <div class="profile-block-val" style="margin-bottom:16px">${biz.locationSignals ? `<span class="stag loc">${x(biz.locationSignals)}</span>` : '<span style="color:#9CA3AF;font-size:13px">No location signals detected</span>'}</div>
-          <div class="profile-block-lbl">Customer Type</div>
-          <div class="profile-block-val">${biz.customerType ? x(biz.customerType) : '<span style="color:#9CA3AF;font-size:13px">Not detected</span>'}</div>
-        </div>
-        <div>
-          <div class="profile-block-lbl">Public Signals (awards, heritage, press)</div>
-          <div style="margin-bottom:16px"><div class="signal-tags">${signalTagsHtml}</div></div>
           <div class="profile-block-lbl">Customer Channels</div>
           ${channelHtml}
         </div>
+        <div>
+          <div class="profile-block-lbl">Public Signals</div>
+          <div style="margin-bottom:16px"><div class="signal-tags">${signalTagsHtml}</div></div>
+          <div class="profile-block-lbl">Products &amp; Services</div>
+          ${prodHtml}
+        </div>
       </div>
-      <div class="profile-block-lbl" style="margin-top:8px">Products &amp; Services Detected</div>
-      ${prodHtml}
     </div>
 
-    <!-- AI PROMPTS TESTED -->
+    <!-- VISIBILITY SNAPSHOT -->
     <div class="rpt-sec">
-      <div class="sec-title">AI-Search Prompts Tested — ${totalQ} Queries</div>
-      <p style="font-size:13.5px;color:#6B7280;margin-bottom:16px;line-height:1.65">These are the specific questions a potential customer would ask an AI assistant when looking for a business like ${x(biz.name)}. We submitted each one to a live AI model and recorded which brands were recommended.</p>
-      <div class="prompt-list">${promptsHtml}</div>
+      <div class="sec-title">Visibility Snapshot — ${queryResults.length} Queries Tested</div>
+      <div class="snap-grid">
+        <div class="snap-col">
+          <div class="snap-col-head appeared">
+            <span class="snap-col-title">Appeared</span>
+            <span class="snap-col-count appeared">${appearedResults.length}</span>
+          </div>
+          <div class="snap-items">${snapAppearedHtml}</div>
+        </div>
+        <div class="snap-col">
+          <div class="snap-col-head missed">
+            <span class="snap-col-title">Not Found</span>
+            <span class="snap-col-count missed">${missedResults.length}</span>
+          </div>
+          <div class="snap-items">${snapMissedHtml}</div>
+        </div>
+        <div class="snap-col">
+          <div class="snap-col-head uncertain">
+            <span class="snap-col-title">Uncertain</span>
+            <span class="snap-col-count uncertain">${uncertainResults.length}</span>
+          </div>
+          <div class="snap-items">${snapUncertainHtml}</div>
+        </div>
+      </div>
+      <p style="margin-top:12px;font-size:12.5px;color:#9CA3AF;line-height:1.6"><strong>Uncertain</strong> results are excluded from the score. They reflect empty AI responses, thin results (only 1 recommendation), or API errors — not confirmed brand invisibility. Score is based on the ${strongResults.length} reliable results only.</p>
     </div>
 
-    <!-- VISIBILITY RESULTS -->
+    <!-- COMPETITOR INTELLIGENCE -->
     <div class="rpt-sec">
-      <div class="sec-title">Visibility Results — Query by Query</div>
-      ${qHtml}
+      <div class="sec-title">Competitor Intelligence</div>
+      <p style="font-size:13.5px;color:#6B7280;margin-bottom:16px;line-height:1.65">Brands that appeared in AI responses when buyers asked about ${x(biz.category || 'your category')}. Credibility is based on how consistently they appeared across multiple queries — single mentions may reflect AI variability rather than genuine competitor presence.</p>
+      ${compTableHtml}
     </div>
-
-    <!-- COMPETITOR VISIBILITY -->
-    ${topCompetitors.length ? `<div class="rpt-sec">
-      <div class="sec-title">Competitor Visibility in AI Results</div>
-      <p style="font-size:13.5px;color:#6B7280;margin-bottom:16px;line-height:1.65">Brands appearing most frequently when buyers ask AI assistants about ${x(biz.category || 'your category')}. Each bar shows appearances out of ${totalQ} tested queries.</p>
-      <div class="comp-bars">${compBarsHtml}</div>
-      ${compInsightHtml}
-    </div>` : ''}
 
     <!-- VISIBILITY GAPS -->
     <div class="rpt-sec">
       <div class="sec-title">Visibility Gaps</div>
-      <p style="font-size:13.5px;color:#6B7280;margin-bottom:16px;line-height:1.65">Specific areas where ${x(biz.name)}'s website is missing signals that AI models use to identify and recommend businesses like yours.</p>
+      <p style="font-size:13.5px;color:#6B7280;margin-bottom:16px;line-height:1.65">Specific areas where ${x(biz.name)}'s website is missing signals that AI models use to identify and recommend businesses like yours. These gaps are inferred from public website evidence — not from AI responses.</p>
       ${gapsHtml}
     </div>
 
     <!-- PRIORITY ACTIONS -->
     <div class="rpt-sec">
       <div class="sec-title">Priority Actions</div>
-      <p style="font-size:13.5px;color:#6B7280;margin-bottom:20px;line-height:1.65">Five specific actions ranked by impact. Each includes what to do, why it improves AI visibility, and what change you should expect to see.</p>
+      <p style="font-size:13.5px;color:#6B7280;margin-bottom:20px;line-height:1.65">Five specific actions, ranked by expected impact. Each action identifies a concrete piece of content or page to create or improve, the visibility gap it addresses, and what result to expect.</p>
       <div class="action-cards">${actionCardsHtml}</div>
     </div>
 
     <!-- MONTHLY TRACKING -->
     <div class="rpt-sec">
-      <div class="sec-title">Monthly Tracking Plan</div>
-      <p style="font-size:13.5px;color:#6B7280;margin-bottom:20px;line-height:1.65">Re-run these prompts in 30 days to measure the impact of any changes made. Use the checklist to standardise each month's review.</p>
+      <div class="sec-title">Monthly Tracking</div>
+      <p style="font-size:13.5px;color:#6B7280;margin-bottom:20px;line-height:1.65">Re-run these queries in 30 days to measure what has changed. Scores become meaningful over time — a single report is a baseline, not a verdict.</p>
       <div class="tracking-grid">
         <div class="track-block">
-          <div class="track-block-lbl">Prompts to re-test (${totalQ} queries)</div>
-          <div class="track-items">${trackPromptsHtml}</div>
+          <div class="track-block-lbl">Queries to re-test (${missedResults.length} priority)</div>
+          <div class="track-items">${missedResults.slice(0, 10).map(q => {
+            const comps = (q.recommendations||[]).filter(r=>{const rl=(r.name||'').toLowerCase();return !rl.includes(bl)&&!bl.includes(rl);}).slice(0,2).map(r=>r.name).join(', ');
+            return `<div class="track-item"><div class="track-checkbox"></div><div><div class="track-prompt-q">${x(q.question)}</div>${comps?`<div class="track-prompt-comp">Currently: ${x(comps)}</div>`:''}</div></div>`;
+          }).join('')}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:16px">
           <div class="track-block">
             <div class="track-block-lbl">Competitors to monitor</div>
-            <div class="track-items">${trackCompsHtml || '<span style="color:#9CA3AF;font-size:13px">No competitors detected in results</span>'}</div>
+            <div class="track-items">${confirmedComps.slice(0,4).map(c=>`<div class="track-comp-item"><div class="track-comp-dot"></div>${x(c.name)} (${c.count}/${totalQ} queries)</div>`).join('') || '<span style="color:#9CA3AF;font-size:13px">No confirmed competitors yet — check next month</span>'}</div>
           </div>
           <div class="track-block">
-            <div class="track-block-lbl">Monthly review checklist</div>
-            <div class="track-items">${trackChecklistHtml}</div>
+            <div class="track-block-lbl">Monthly checklist</div>
+            <div class="track-items">${[
+              'Re-run report and record score change',
+              'Note any new competitor names appearing',
+              'Check that new FAQ/content pages are indexed',
+              'Review which query types improved',
+              'Update product pages if range has changed',
+            ].map(item=>`<div class="track-item"><div class="track-checkbox"></div>${x(item)}</div>`).join('')}</div>
           </div>
         </div>
       </div>
       <div class="tracking-cta">
         <p>Next report due: ${nextCheckStr}</p>
-        <small>AI visibility changes as content is updated and models are retrained. Monthly tracking identifies which actions are working and where new competitors are emerging.</small>
+        <small>AI visibility shifts as website content is updated, models retrain, and competitors optimise. Monthly tracking turns a single data point into a trend — and a trend into commercial intelligence.</small>
       </div>
+    </div>
+
+    <!-- APPENDIX TOGGLE -->
+    <div class="appendix-toggle" id="appendix-toggle">
+      <span class="appendix-toggle-icon" id="appendix-icon">▶</span>
+      <span id="appendix-toggle-label">Show full query evidence (${queryResults.length} queries)</span>
+    </div>
+    <div class="appendix-section" id="appendix-section">
+      <div class="appendix-label">Appendix A — Query-by-Query Evidence</div>
+      <div style="padding:0 56px 8px;font-size:13px;color:#6B7280;line-height:1.65">Full AI responses for each tested query. Confidence badges indicate result quality. Results marked "Poor AI result" or "Thin result" are excluded from the visibility score.</div>
+      <div style="padding:0 56px 32px">${qHtml}</div>
+      <div class="appendix-label">Appendix B — Prompts Tested</div>
+      <div style="padding:0 56px 32px"><div class="prompt-list">${promptsHtml}</div></div>
     </div>
 
     <!-- METHODOLOGY -->
     <div class="rpt-sec">
-      <div class="sec-title">Methodology</div>
+      <div class="sec-title">Methodology &amp; Limitations</div>
       <div class="method-box">
-        <p>This report was generated by <strong>Visible</strong> on <strong>${dateStr}</strong>. The analysis uses a two-stage process: (1) public website signals — page title, meta description, headings, and visible body content — are analysed to infer the business category and generate a set of realistic AI-shopping queries; (2) each query is submitted to a live AI language model, and the full response is recorded, including all brands recommended.</p>
-        <p style="margin-top:10px">The <strong>AI Visibility Score</strong> is the percentage of the ${totalQ} tested queries in which <strong>${x(biz.name)}</strong> was mentioned by name in the AI response. Competitor counts reflect how often each other brand appeared across the same set of queries.</p>
-        <p style="margin-top:10px"><strong>Limitations:</strong> AI model outputs vary across providers and change over time as models are updated. This report reflects responses from a single AI provider at a single point in time and should be treated as directional rather than definitive. Query selection is automated and may not capture all relevant queries for every business category.</p>
-        <p style="margin-top:10px;color:#9CA3AF"><em>Confidential — generated for internal admin review only. Not for distribution.</em></p>
+        <p>Generated by <strong>Visible</strong> on <strong>${dateStr}</strong>. Website signals (title, meta description, headings, body text) were used to infer the business category and generate ${queryResults.length} realistic buyer queries. Each query was submitted to a live AI language model and responses were recorded verbatim.</p>
+        <p style="margin-top:10px"><strong>Score:</strong> Percentage of <em>reliable</em> results (4–5 recommendations returned) in which ${x(biz.name)} was named. ${uncertainResults.length > 0 ? uncertainResults.length + ' result' + (uncertainResults.length > 1 ? 's' : '') + ' (empty responses, single-recommendation results, and API errors) were excluded from the score.' : ''}</p>
+        <p style="margin-top:10px"><strong>Limitations:</strong> AI model outputs vary across providers and change as models are updated. Results reflect a single provider at a single point in time — treat as directional. Competitor mentions should not be treated as confirmed until they appear consistently across multiple monthly reports.</p>
+        <p style="margin-top:10px;color:#9CA3AF"><em>Internal admin review copy. Not for external distribution.</em></p>
       </div>
     </div>
 
@@ -1293,11 +1468,25 @@ function renderReport(r) {
         <div class="logo-icon"><svg width="9" height="9" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="white" stroke-width="2"/><circle cx="7" cy="7" r="2" fill="white"/></svg></div>
         Visible
       </div>
-      <span>AI Visibility Report · ${dateStr} · Internal review copy</span>
+      <span>AI Visibility Report · ${dateStr} · ${x(biz.name)}</span>
       <span style="font-family:'JetBrains Mono',monospace;font-size:11px">${r.id}</span>
     </div>
 
   </div>`;
+
+  // Wire appendix toggle
+  const toggleBtn = document.getElementById('appendix-toggle');
+  if (toggleBtn) {
+    toggleBtn.onclick = function() {
+      const section = document.getElementById('appendix-section');
+      const icon = document.getElementById('appendix-icon');
+      const lbl = document.getElementById('appendix-toggle-label');
+      const isOpen = section.style.display === 'block';
+      section.style.display = isOpen ? 'none' : 'block';
+      icon.classList.toggle('open', !isOpen);
+      lbl.textContent = isOpen ? 'Show full query evidence (' + queryResults.length + ' queries)' : 'Hide query evidence';
+    };
+  }
 }
 
 /* ── Save / load ── */
