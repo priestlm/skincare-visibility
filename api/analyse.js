@@ -623,7 +623,7 @@ async function callGemini(prompt) {
   const MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash'];
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 2000 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 4000 },
   };
 
   let result, usedModel;
@@ -671,7 +671,7 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, t
       { role: 'user', content: prompt },
     ],
     temperature: 0.2,
-    max_tokens: 2000,
+    max_tokens: 4000,
   };
   try {
     const result = await postJson(endpoint, payload, timeout, { Authorization: `Bearer ${apiKey}` });
@@ -707,7 +707,9 @@ async function callOpenRouter(prompt) {
   const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
   // One fast model — Gemini already took some budget; keep this under 20s
   const models = [
-    'openai/gpt-oss-20b:free',
+    'deepseek/deepseek-r1:free',
+    'deepseek/deepseek-chat-v3-0324:free',
+    'qwen/qwen3-8b:free',
   ];
   let lastErr;
   for (const model of models) {
