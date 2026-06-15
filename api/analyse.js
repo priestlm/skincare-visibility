@@ -1001,23 +1001,9 @@ function applyGeminiResult(gemini, brandNameInput) {
     }
   }
 
-  function questionSupported(q) {
-    const ql = q.question.toLowerCase();
-    // Always reject cross-category mismatches (e.g. gin question for a nut butter brand)
-    if (questionMismatch(ql, primaryKey)) return false;
-    // If the AI provided allowed_topics, check the question's evidence_term is on-topic
-    if (allowedTopicWords.size > 0 && q.evidence_term) {
-      const et = q.evidence_term.toLowerCase().trim();
-      const etWords = et.split(/[\s\/,&\-]+/).filter(w => w.length > 2);
-      if (etWords.length > 0 && !etWords.some(w => allowedTopicWords.has(w) || evidenceTerms.has(w))) return false;
-    }
-    return true;
-  }
+  // Only reject questions that clearly belong to a different category (e.g. gin for a nut butter brand)
+  const validQs = normalisedQs.filter(q => !questionMismatch(q.question.toLowerCase(), primaryKey));
 
-  const validQs = normalisedQs.filter(questionSupported);
-
-  // Never pad AI-assisted questions with preloaded or generic templates.
-  // If Gemini didn't generate enough supported questions, say so â€” don't invent.
   let weakEvidence = false;
   const finalQs = [...validQs];
   if (finalQs.length < 3) weakEvidence = true;
@@ -1219,6 +1205,9 @@ module.exports = async (req, res) => {
     categories: categoryLabels, customerType,
     questions, questionsRich, weakEvidence, riskNarrative,
     confidence: ai.confidence_score,
+    ddgSummary: ddgSignal?.abstract || null,
+    ddgTopics: ddgSignal?.topics || [],
+    ddgInfobox: ddgSignal?.infobox || [],
   };
 
   if (!weakEvidence) cacheSet(cacheKey, responseData);

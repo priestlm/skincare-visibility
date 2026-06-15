@@ -759,6 +759,9 @@ async function generateReport() {
         customerChannels: analysis.customerChannels || [],
         locationSignals: analysis.locationSignals || '',
         customerType: analysis.customerType || '',
+        ddgSummary: analysis.ddgSummary || '',
+        ddgTopics: analysis.ddgTopics || [],
+        ddgInfobox: analysis.ddgInfobox || [],
       },
       visibilityScore: score,
       mentionCount,
@@ -1374,6 +1377,7 @@ function renderReport(r) {
     <div class="rpt-sec">
       <div class="sec-title">Company Profile Detected</div>
       ${biz.summary ? `<p class="profile-main">${x(biz.summary)}</p>` : ''}
+      ${biz.ddgSummary ? `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:14px 18px;margin-bottom:18px"><div style="font-size:11px;font-weight:700;color:#15803D;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">DuckDuckGo Overview</div><p style="margin:0 0 ${biz.ddgInfobox.length ? '10px' : '0'};font-size:14px;color:#374151;line-height:1.65">${x(biz.ddgSummary)}</p>${biz.ddgInfobox.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${biz.ddgInfobox.map(f => `<span style="background:#DCFCE7;color:#166534;font-size:12px;padding:3px 9px;border-radius:12px">${x(f)}</span>`).join('')}</div>` : ''}</div>` : ''}
       <div class="profile-grid">
         <div>
           <div class="profile-block-lbl">Category &amp; Niche</div>
