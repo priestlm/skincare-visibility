@@ -146,7 +146,7 @@ Return ONLY valid JSON:
 
   // 3. OpenRouter free models as last resort
   if (hasOpenRouter) {
-    for (const model of ['meta-llama/llama-3.1-8b-instruct:free', 'mistralai/mistral-7b-instruct:free']) {
+    for (const model of ['google/gemma-3-12b-it:free', 'google/gemma-3-4b-it:free', 'microsoft/phi-4-reasoning-plus:free']) {
       const r = await attempt(
         () => tryOpenAI('https://openrouter.ai/api/v1/chat/completions', model, prompt, process.env.OPENROUTER_API_KEY,
           { 'HTTP-Referer': 'https://visible.ai', 'X-Title': 'Visible AI' }, 10000),

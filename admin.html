@@ -639,7 +639,7 @@ async function generateReport() {
     }
 
     // Step 2 — run queries in parallel batches of 5
-    const BATCH = 5;
+    const BATCH = 2;
     const qResults = [];
     const compCount = {};
     const compPromptTypes = {};
@@ -659,6 +659,7 @@ async function generateReport() {
     setStep('query', 'active', '0/' + totalQ + ' queries complete');
 
     for (let i = 0; i < questions.length; i += BATCH) {
+      if (i > 0) await new Promise(r => setTimeout(r, 1000));
       const batch = questions.slice(i, i + BATCH);
       const settled = await Promise.allSettled(
         batch.map(q => fetchQuery(q.question, q.intent, q.promptType, orgName))
