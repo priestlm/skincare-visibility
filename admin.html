@@ -585,6 +585,8 @@ document.querySelectorAll('.qf-btn').forEach(btn => {
 document.getElementById('gen-btn').onclick = generateReport;
 
 async function fetchQuery(question, intent, promptType, orgName, attempt = 0) {
+  // Delays: 4s, 8s, 12s between retries
+  const RETRY_DELAYS = [4000, 8000, 12000];
   try {
     const qr = await post('/api/ask', {question, businessName: orgName});
     if (!qr.ok) throw new Error('HTTP ' + qr.status);
@@ -594,8 +596,8 @@ async function fetchQuery(question, intent, promptType, orgName, attempt = 0) {
     const quality = recCount >= 4 ? 'strong' : recCount >= 2 ? 'moderate' : recCount === 1 ? 'thin' : 'empty';
     return {question, intent, promptType, intro: qd.intro || '', recommendations: qd.recommendations || [], businessMentioned: qd.businessMentioned || false, recCount, quality};
   } catch (err) {
-    if (attempt < 2) {
-      await new Promise(r => setTimeout(r, 2000 + attempt * 1500));
+    if (attempt < RETRY_DELAYS.length) {
+      await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
       return fetchQuery(question, intent, promptType, orgName, attempt + 1);
     }
     throw err;
@@ -658,7 +660,7 @@ async function generateReport() {
     }
 
     // Step 2 — run queries in parallel batches of 5
-    const BATCH = 2;
+    const BATCH = 1;
     const qResults = [];
     const compCount = {};
     const compPromptTypes = {};
@@ -678,7 +680,7 @@ async function generateReport() {
     setStep('query', 'active', '0/' + totalQ + ' queries complete');
 
     for (let i = 0; i < questions.length; i += BATCH) {
-      if (i > 0) await new Promise(r => setTimeout(r, 1000));
+      if (i > 0) await new Promise(r => setTimeout(r, 3000));
       const batch = questions.slice(i, i + BATCH);
       const settled = await Promise.allSettled(
         batch.map(q => fetchQuery(q.question, q.intent, q.promptType, orgName))
