@@ -583,14 +583,14 @@ async function callGemini(prompt) {
   const MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash'];
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 5000 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 2000 },
   };
 
   let result, usedModel;
   try {
     for (const model of MODELS) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      result = await postJson(endpoint, payload, 5000);
+      result = await postJson(endpoint, payload, 20000);
       usedModel = model;
       if (result.status === 200) break;
       // On 429 or 404 try the next model; on other errors stop immediately
@@ -631,7 +631,7 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, t
       { role: 'user', content: prompt },
     ],
     temperature: 0.2,
-    max_tokens: 3000,
+    max_tokens: 2000,
   };
   try {
     const result = await postJson(endpoint, payload, timeout, { Authorization: `Bearer ${apiKey}` });
