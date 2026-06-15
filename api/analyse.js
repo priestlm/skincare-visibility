@@ -705,11 +705,12 @@ async function callOpenRouter(prompt) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) return null;
   const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-  // One fast model — Gemini already took some budget; keep this under 20s
   const models = [
-    'deepseek/deepseek-r1:free',
-    'deepseek/deepseek-chat-v3-0324:free',
+    'meta-llama/llama-3.1-8b-instruct:free',
     'qwen/qwen3-8b:free',
+    'deepseek/deepseek-chat-v3-0324:free',
+    'mistralai/mistral-7b-instruct:free',
+    'deepseek/deepseek-r1:free',
   ];
   let lastErr;
   for (const model of models) {
@@ -717,8 +718,8 @@ async function callOpenRouter(prompt) {
     if (result && !result._error) return result;
     lastErr = result;
     const errStr = result?._error || '';
-    // Only continue to next model on 404 or 429; stop on auth/server errors
-    if (!errStr.includes('404') && !errStr.includes('429')) break;
+    // Stop only on auth errors; retry everything else (404 model gone, 429 rate limit, 5xx server errors)
+    if (errStr.includes('401') || errStr.includes('403')) break;
   }
   return lastErr || { _error: 'openrouter_all_failed' };
 }
