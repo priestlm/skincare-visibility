@@ -647,7 +647,7 @@ async function generateReport() {
       clearInterval(analyseTicker);
       setStep('analyse', 'err', 'AI analysis failed — could not generate brand-specific questions');
       setStage('empty');
-      alert('Could not analyse this brand.\n\nThe AI was unable to identify the brand\'s products and generate relevant questions. This is usually caused by AI providers being temporarily unavailable.\n\nPlease try again in a minute.');
+      alert('Could not analyse this brand.\n\nError: ' + (analysis.aiError || 'unknown') + '\n\nPlease try again in a minute.');
       return;
     }
 

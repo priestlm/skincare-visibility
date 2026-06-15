@@ -684,7 +684,7 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, t
 function callGroq(prompt) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return Promise.resolve(null);
-  return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', apiKey, prompt, 'Groq', 12000);
+  return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions', 'llama-3.3-70b-versatile', apiKey, prompt, 'Groq', 25000);
 }
 
 // OpenRouter — works from Vercel, free tier (200 RPD), no credit card required
