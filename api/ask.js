@@ -89,9 +89,8 @@ module.exports = async (req, res) => {
   if (!question) return res.status(400).json({ error: 'question is required' });
 
   const hasGroq = !!process.env.GROQ_API_KEY;
-  const hasGemini = !!process.env.GEMINI_API_KEY;
   const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;
-  if (!hasGroq && !hasGemini && !hasOpenRouter) {
+  if (!hasGroq && !hasOpenRouter) {
     return res.status(503).json({ error: 'no_ai_provider' });
   }
 
@@ -124,27 +123,17 @@ Return ONLY valid JSON:
     }
   }
 
-  // 1. Groq — fastest, generous free rate limits
+  // 1. Groq — primary
   if (hasGroq) {
     const r = await attempt(
       () => tryOpenAI('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', prompt, process.env.GROQ_API_KEY, {}, 8000),
       'groq'
     );
     if (r.ok) return res.status(200).json({ ...r.data, businessName: businessName || '' });
-    if (r.rateLimited) console.log('Groq rate-limited, trying Gemini');
+    if (r.rateLimited) console.log('Groq rate-limited, trying OpenRouter');
   }
 
-  // 2. Gemini flash-lite then flash
-  if (hasGemini) {
-    for (const model of ['gemini-2.0-flash-lite', 'gemini-2.0-flash']) {
-      const r = await attempt(() => tryGemini(model, prompt, process.env.GEMINI_API_KEY), 'gemini-' + model);
-      if (r.ok) return res.status(200).json({ ...r.data, businessName: businessName || '' });
-      if (r.rateLimited) { console.log('Gemini', model, 'rate-limited, trying next'); continue; }
-      if (r.failed) break;
-    }
-  }
-
-  // 3. OpenRouter free models as last resort
+  // 2. OpenRouter free models as fallback
   if (hasOpenRouter) {
     for (const model of ['deepseek/deepseek-r1:free', 'deepseek/deepseek-chat-v3-0324:free', 'qwen/qwen3-8b:free']) {
       const r = await attempt(

@@ -727,15 +727,15 @@ async function callOpenRouter(prompt) {
 async function callAI(extracted, targetUrl, analysisStatus, ddgSignal) {
   const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal);
 
-  // Groq first — typically <2s response, generous rate limits
+  // Groq primary — fast, free
   const groqResult = await callGroq(prompt);
   if (groqResult && !groqResult._error) return groqResult;
 
-  // Gemini fallback — 15s timeout to stay within Vercel 45s budget
-  const geminiResult = await callGemini(prompt);
-  if (geminiResult && !geminiResult._error) return geminiResult;
+  // OpenRouter fallback — free tier
+  const openRouterResult = await callOpenRouter(prompt);
+  if (openRouterResult && !openRouterResult._error) return openRouterResult;
 
-  return geminiResult || groqResult || { _error: 'no_ai_provider' };
+  return openRouterResult || groqResult || { _error: 'no_ai_provider' };
 }
 
 // â”€â”€ Niche question templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
