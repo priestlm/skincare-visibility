@@ -1270,7 +1270,7 @@ function renderReport(r) {
   // ── Visibility snapshot HTML ──
   const bl = biz.name.toLowerCase();
   const snapAppearedHtml = appearedResults.map(q => {
-    const compsThere = (q.recommendations || []).filter(r => { const rl=(r.name||'').toLowerCase(); return !rl.includes(bl)&&!bl.includes(rl); }).slice(0,2).map(r=>r.name).join(', ');
+    const compsThere = (q.recommendations || []).filter(r => { const rl=(r.name||'').toLowerCase(); return !rl.includes(bl)&&!bl.includes(rl); }).slice(0,3).map(r=>r.name).join(', ');
     return `<div class="snap-item">
       <div class="snap-item-q">"${x(q.question.length > 70 ? q.question.slice(0,70)+'…' : q.question)}"</div>
       ${compsThere ? `<div class="snap-item-sub">Also: ${x(compsThere)}</div>` : '<div class="snap-item-sub" style="color:#059669">Only brand recommended</div>'}
@@ -1278,7 +1278,7 @@ function renderReport(r) {
   }).join('') || '<div class="snap-item"><div class="snap-item-q" style="color:#9CA3AF;font-style:normal">No appearances in reliable results</div></div>';
 
   const snapMissedHtml = missedResults.map(q => {
-    const winners = (q.recommendations || []).filter(r => { const rl=(r.name||'').toLowerCase(); return !rl.includes(bl)&&!bl.includes(rl); }).slice(0,2).map(r=>r.name).join(', ');
+    const winners = (q.recommendations || []).filter(r => { const rl=(r.name||'').toLowerCase(); return !rl.includes(bl)&&!bl.includes(rl); }).slice(0,3).map(r=>r.name).join(', ');
     return `<div class="snap-item">
       <div class="snap-item-q">"${x(q.question.length > 70 ? q.question.slice(0,70)+'…' : q.question)}"</div>
       ${winners ? `<div class="snap-item-sub comp">→ ${x(winners)}</div>` : '<div class="snap-item-sub">No brand recommended</div>'}
@@ -1454,7 +1454,7 @@ function renderReport(r) {
         <div class="track-block">
           <div class="track-block-lbl">Queries to re-test (${missedResults.length} priority)</div>
           <div class="track-items">${missedResults.slice(0, 10).map(q => {
-            const comps = (q.recommendations||[]).filter(r=>{const rl=(r.name||'').toLowerCase();return !rl.includes(bl)&&!bl.includes(rl);}).slice(0,2).map(r=>r.name).join(', ');
+            const comps = (q.recommendations||[]).filter(r=>{const rl=(r.name||'').toLowerCase();return !rl.includes(bl)&&!bl.includes(rl);}).slice(0,3).map(r=>r.name).join(', ');
             return `<div class="track-item"><div class="track-checkbox"></div><div><div class="track-prompt-q">${x(q.question)}</div>${comps?`<div class="track-prompt-comp">Currently: ${x(comps)}</div>`:''}</div></div>`;
           }).join('')}</div>
         </div>

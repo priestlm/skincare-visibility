@@ -988,8 +988,19 @@ function applyGeminiResult(gemini, brandNameInput) {
     }
   }
 
-  // Only reject questions that clearly belong to a different category (e.g. gin for a nut butter brand)
-  const validQs = normalisedQs.filter(q => !questionMismatch(q.question.toLowerCase(), primaryKey));
+  // Build a set of brand name words to detect brand-named questions
+  const brandWords = new Set(
+    (organisationName + ' ' + (gemini.brand_name || '') + ' ' + (brandNameInput || ''))
+      .toLowerCase().split(/\s+/).filter(w => w.length > 2)
+  );
+
+  // Reject: (a) cross-category mismatches, (b) questions that name the brand (AI won't recommend it if already named)
+  const validQs = normalisedQs.filter(q => {
+    const ql = q.question.toLowerCase();
+    if (questionMismatch(ql, primaryKey)) return false;
+    if (brandWords.size > 0 && [...brandWords].some(w => ql.includes(w))) return false;
+    return true;
+  });
 
   let weakEvidence = false;
   const finalQs = [...validQs];
