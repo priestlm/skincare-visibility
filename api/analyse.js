@@ -590,7 +590,7 @@ async function callGemini(prompt) {
   try {
     for (const model of MODELS) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      result = await postJson(endpoint, payload, 20000);
+      result = await postJson(endpoint, payload, 15000);
       usedModel = model;
       if (result.status === 200) break;
       // On 429 or 404 try the next model; on other errors stop immediately
@@ -657,7 +657,7 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, t
 function callGroq(prompt) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return Promise.resolve(null);
-  return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', apiKey, prompt, 'Groq');
+  return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', apiKey, prompt, 'Groq', 12000);
 }
 
 // OpenRouter — works from Vercel, free tier (200 RPD), no credit card required
@@ -685,17 +685,15 @@ async function callOpenRouter(prompt) {
 async function callAI(extracted, targetUrl, analysisStatus) {
   const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus);
 
-  const geminiResult = await callGemini(prompt);
-  if (geminiResult && !geminiResult._error) return geminiResult;
-
+  // Groq first — typically <2s response, generous rate limits
   const groqResult = await callGroq(prompt);
   if (groqResult && !groqResult._error) return groqResult;
 
-  const openRouterResult = await callOpenRouter(prompt);
-  if (openRouterResult && !openRouterResult._error) return openRouterResult;
+  // Gemini fallback — 15s timeout to stay within Vercel 45s budget
+  const geminiResult = await callGemini(prompt);
+  if (geminiResult && !geminiResult._error) return geminiResult;
 
-  // All failed — return most informative error
-  return openRouterResult || geminiResult || groqResult || { _error: 'no_ai_provider' };
+  return geminiResult || groqResult || { _error: 'no_ai_provider' };
 }
 
 // â”€â”€ Niche question templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
