@@ -82,7 +82,37 @@ Return ONLY valid JSON in this exact format (no markdown, no code fences):
   ]
 }`;
 
-  // Try OpenRouter with multiple free models
+  // Try Gemini first — paid key, more reliable under parallel load
+  if (process.env.GEMINI_API_KEY) {
+    const GEMINI_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash'];
+    for (const model of GEMINI_MODELS) {
+      try {
+        const geminiPrompt = prompt + '\n\nIMPORTANT: Return ONLY the JSON object. No markdown. No code fences.';
+        const payload = {
+          contents: [{ parts: [{ text: geminiPrompt }] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
+        };
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const result = await postJson(endpoint, payload, 15000);
+        if (result.status === 429) { console.log('Gemini', model, 'rate-limited, trying next'); continue; }
+        if (result.status === 200) {
+          const text = result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          try {
+            const parsed = parseRecsJson(text, businessName);
+            return res.status(200).json({ ...parsed, businessName: businessName || '' });
+          } catch (parseErr) {
+            console.error('Gemini', model, 'parse error:', parseErr.message);
+            continue;
+          }
+        }
+        console.error('Gemini', model, 'error', result.status, JSON.stringify(result.body).slice(0, 200));
+      } catch (err) {
+        console.error('Gemini', model, 'failed:', err.message);
+      }
+    }
+  }
+
+  // OpenRouter fallback — free tier, may rate-limit under parallel load
   if (process.env.OPENROUTER_API_KEY) {
     const OR_MODELS = [
       'meta-llama/llama-3.1-8b-instruct:free',
@@ -127,36 +157,6 @@ Return ONLY valid JSON in this exact format (no markdown, no code fences):
         console.error('OpenRouter', model, 'error', result.status, JSON.stringify(result.body).slice(0, 200));
       } catch (err) {
         console.error('OpenRouter', model, 'failed:', err.message);
-      }
-    }
-  }
-
-  // Gemini fallback — use flash-lite for speed, flash as backup
-  if (process.env.GEMINI_API_KEY) {
-    const GEMINI_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash'];
-    for (const model of GEMINI_MODELS) {
-      try {
-        const geminiPrompt = prompt + '\n\nIMPORTANT: Return ONLY the JSON object. No markdown. No code fences.';
-        const payload = {
-          contents: [{ parts: [{ text: geminiPrompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
-        };
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-        const result = await postJson(endpoint, payload, 12000);
-        if (result.status === 429) { console.log('Gemini', model, 'rate-limited, trying next'); continue; }
-        if (result.status === 200) {
-          const text = result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          try {
-            const parsed = parseRecsJson(text, businessName);
-            return res.status(200).json({ ...parsed, businessName: businessName || '' });
-          } catch (parseErr) {
-            console.error('Gemini', model, 'parse error:', parseErr.message);
-            continue;
-          }
-        }
-        console.error('Gemini', model, 'error', result.status);
-      } catch (err) {
-        console.error('Gemini', model, 'failed:', err.message);
       }
     }
   }
