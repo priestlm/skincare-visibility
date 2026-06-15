@@ -82,7 +82,43 @@ Return ONLY valid JSON in this exact format (no markdown, no code fences):
   ]
 }`;
 
-  // Try Gemini first — paid key, more reliable under parallel load
+  // Try Groq first — fast, generous free tier, handles parallel load well
+  if (process.env.GROQ_API_KEY) {
+    try {
+      const payload = {
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: 'You are a helpful AI shopping and recommendation assistant. Return only valid JSON — no markdown, no code fences.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.4,
+        max_tokens: 800,
+      };
+      const result = await postJson(
+        'https://api.groq.com/openai/v1/chat/completions',
+        payload,
+        10000,
+        { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      );
+      if (result.status === 200) {
+        const text = result.body?.choices?.[0]?.message?.content || '';
+        try {
+          const parsed = parseRecsJson(text, businessName);
+          return res.status(200).json({ ...parsed, businessName: businessName || '' });
+        } catch (parseErr) {
+          console.error('Groq parse error:', parseErr.message);
+        }
+      } else if (result.status === 429) {
+        console.log('Groq rate-limited, falling back');
+      } else {
+        console.error('Groq error', result.status, JSON.stringify(result.body).slice(0, 200));
+      }
+    } catch (err) {
+      console.error('Groq failed:', err.message);
+    }
+  }
+
+  // Try Gemini — paid key, more reliable under parallel load
   if (process.env.GEMINI_API_KEY) {
     const GEMINI_MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash'];
     for (const model of GEMINI_MODELS) {
