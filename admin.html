@@ -99,6 +99,8 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
 .gstep{display:flex;align-items:center;gap:12px;padding:11px 16px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);font-size:13.5px;color:var(--ink-soft);transition:all .3s}
 .gstep.done{color:var(--success);border-color:rgba(52,211,153,.2);background:rgba(52,211,153,.05)}
 .gstep.active{color:var(--accent-b);border-color:rgba(99,102,241,.25);background:rgba(99,102,241,.07)}
+.gstep.active .gstep-icon{animation:spin 1.2s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .gstep.err{color:var(--danger);border-color:rgba(248,113,113,.2);background:rgba(248,113,113,.05)}
 .gstep-icon{width:18px;flex:none;text-align:center}
 .gstep-lbl{flex:1}
@@ -615,10 +617,27 @@ async function generateReport() {
     ['Analysing website and detecting category…', 'Testing AI visibility — preparing queries…', 'Building report…']
   );
 
+  // Animated status ticker for the analyse step
+  const analyseMessages = [
+    'Fetching website…',
+    'Reading page content…',
+    'Detecting business category…',
+    'Identifying products & signals…',
+    'Generating AI search queries…',
+    'Almost there…',
+  ];
+  let analyseTickIdx = 0;
+  const analyseTicker = setInterval(() => {
+    analyseTickIdx = (analyseTickIdx + 1) % analyseMessages.length;
+    const el = document.getElementById('gss-analyse');
+    if (el) el.textContent = analyseMessages[analyseTickIdx];
+  }, 3000);
+
   try {
     // Step 1 — analyse
-    setStep('analyse', 'active');
+    setStep('analyse', 'active', analyseMessages[0]);
     const ar = await post('/api/analyse', {url, brandName: brand, market});
+    clearInterval(analyseTicker);
     if (!ar.ok) throw new Error('Analysis failed (' + ar.status + ')');
     const analysis = await ar.json();
     setStep('analyse', 'done', 'Category: ' + (analysis.primary || 'unknown'));
@@ -745,6 +764,7 @@ async function generateReport() {
     setTimeout(() => { setStage('report'); renderReport(current); }, 700);
 
   } catch(err) {
+    clearInterval(analyseTicker);
     console.error(err);
     setStage('empty');
     alert('Report generation failed: ' + err.message);
@@ -1559,7 +1579,7 @@ function setStep(id, state, status) {
   const el = document.getElementById('gstep-' + id);
   if (!el) return;
   el.className = 'gstep ' + state;
-  el.querySelector('.gstep-icon').textContent = {done:'✓',active:'◌',err:'✗'}[state]||'○';
+  el.querySelector('.gstep-icon').textContent = {done:'✓',active:'◈',err:'✗'}[state]||'○';
   if (status) document.getElementById('gss-'+id).textContent = status;
 }
 
