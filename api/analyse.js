@@ -988,17 +988,16 @@ function applyGeminiResult(gemini, brandNameInput) {
     }
   }
 
-  // Build a set of brand name words to detect brand-named questions
-  const brandWords = new Set(
-    (organisationName + ' ' + (gemini.brand_name || '') + ' ' + (brandNameInput || ''))
-      .toLowerCase().split(/\s+/).filter(w => w.length > 2)
-  );
+  // Build brand name phrases to detect brand-named questions (phrase match only, not individual words)
+  const brandPhrases = [organisationName, gemini.brand_name || '', brandNameInput || '']
+    .map(s => s.toLowerCase().trim())
+    .filter(s => s.length > 3);
 
-  // Reject: (a) cross-category mismatches, (b) questions that name the brand (AI won't recommend it if already named)
+  // Reject: (a) cross-category mismatches, (b) questions that contain the brand name as a phrase
   const validQs = normalisedQs.filter(q => {
     const ql = q.question.toLowerCase();
     if (questionMismatch(ql, primaryKey)) return false;
-    if (brandWords.size > 0 && [...brandWords].some(w => ql.includes(w))) return false;
+    if (brandPhrases.some(p => ql.includes(p))) return false;
     return true;
   });
 
