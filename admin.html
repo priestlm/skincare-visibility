@@ -582,14 +582,22 @@ document.querySelectorAll('.qf-btn').forEach(btn => {
 /* ── Generate report ── */
 document.getElementById('gen-btn').onclick = generateReport;
 
-async function fetchQuery(question, intent, promptType, orgName) {
-  const qr = await post('/api/ask', {question, businessName: orgName});
-  if (!qr.ok) throw new Error('HTTP ' + qr.status);
-  const qd = await qr.json();
-  if (qd.error || !Array.isArray(qd.recommendations)) throw new Error(qd.error || 'bad response');
-  const recCount = qd.recommendationCount || (qd.recommendations || []).length;
-  const quality = recCount >= 4 ? 'strong' : recCount >= 2 ? 'moderate' : recCount === 1 ? 'thin' : 'empty';
-  return {question, intent, promptType, intro: qd.intro || '', recommendations: qd.recommendations || [], businessMentioned: qd.businessMentioned || false, recCount, quality};
+async function fetchQuery(question, intent, promptType, orgName, attempt = 0) {
+  try {
+    const qr = await post('/api/ask', {question, businessName: orgName});
+    if (!qr.ok) throw new Error('HTTP ' + qr.status);
+    const qd = await qr.json();
+    if (qd.error || !Array.isArray(qd.recommendations)) throw new Error(qd.error || 'bad response');
+    const recCount = qd.recommendationCount || (qd.recommendations || []).length;
+    const quality = recCount >= 4 ? 'strong' : recCount >= 2 ? 'moderate' : recCount === 1 ? 'thin' : 'empty';
+    return {question, intent, promptType, intro: qd.intro || '', recommendations: qd.recommendations || [], businessMentioned: qd.businessMentioned || false, recCount, quality};
+  } catch (err) {
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 2000 + attempt * 1500));
+      return fetchQuery(question, intent, promptType, orgName, attempt + 1);
+    }
+    throw err;
+  }
 }
 
 async function generateReport() {
