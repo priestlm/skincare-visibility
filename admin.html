@@ -1208,7 +1208,6 @@ function renderReport(r) {
     ? 'Visible for: ' + appearedTypeStr + ' queries. Missing for: ' + missedTypeStr + ' queries.'
     : appearedResults.length === 0 ? 'All tested query types returned competitors or no result.' : '';
 
-  const confirmedComps = topCompetitors.filter(c => (c.credibility || 'unverified') === 'confirmed');
   const competitorAnswer = confirmedComps.length
     ? confirmedComps.slice(0,3).map(c => c.name + ' (' + c.count + '/' + totalQ + ')').join(', ')
     : topCompetitors.length
