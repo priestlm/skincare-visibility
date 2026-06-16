@@ -913,19 +913,25 @@ function categorizeDDG(ddgSignal, targetUrl, brandNameHint) {
   return { primary, categories, weak: topScore === 0 };
 }
 
-// â”€â”€ AI orchestrator: Groq â†' OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ AI orchestrator: Gemini â†' OpenRouter â†' Groq â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function callAI(extracted, targetUrl, analysisStatus, ddgSignal, userLocation) {
   const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLocation);
 
-  // Groq primary — fast, free
-  const groqResult = await callGroq(prompt);
-  if (groqResult && !groqResult._error) return groqResult;
+  // Gemini primary — works from Vercel IPs, free tier
+  const geminiResult = await callGemini(prompt);
+  if (geminiResult && !geminiResult._error) return geminiResult;
+  console.warn('Gemini failed:', geminiResult?._error);
 
   // OpenRouter fallback — free tier
   const openRouterResult = await callOpenRouter(prompt);
   if (openRouterResult && !openRouterResult._error) return openRouterResult;
+  console.warn('OpenRouter failed:', openRouterResult?._error);
 
-  return openRouterResult || groqResult || { _error: 'no_ai_provider' };
+  // Groq last resort (blocked on Vercel but worth trying)
+  const groqResult = await callGroq(prompt);
+  if (groqResult && !groqResult._error) return groqResult;
+
+  return groqResult || openRouterResult || geminiResult || { _error: 'no_ai_provider' };
 }
 
 // â”€â”€ Niche question templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
