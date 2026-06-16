@@ -649,8 +649,8 @@ RULES:
    GOOD: “what's the best nut butter for smoothies?” / “where can I buy almond butter online in the UK?” / “is almond butter good for weight loss?”
    BAD: “find me award-winning nut butters” / “recommend a premium natural nut butter brand”
 4. Do NOT write questions about categories not relevant to this brand.
-5. Generate AT LEAST 22 questions covering DIFFERENT angles — no two questions should have the same core intent.
-   Required spread: discovery(4+), specific_product(4+), comparison(3+), occasion(2+), gift(2+), awareness(2+), location(2+).
+5. Generate AT LEAST 12 questions covering DIFFERENT angles — no two questions should have the same core intent.
+   Required spread: discovery(3+), specific_product(3+), comparison(2+), occasion(1+), gift(1+), awareness(1+), location(1+).
    DIVERSITY RULE: Each question must ask about a genuinely different product, use-case, or audience. Do NOT generate variations like “best X for Y” and “top X for Y” — they count as one question.${userLocation ? `
    LOCATION RULE: Include at least 3 location questions using “${[userLocation.town, userLocation.county].filter(Boolean).join('” or “')}” as the named place. Examples: “best [service] in ${userLocation.town}”, “where can I find [product] near ${userLocation.town}”, “[service] near ${userLocation.town} recommendations”.` : ''}
 6. visibility_gaps: name actual product types, page types, or information a buyer would want. Not “add more content” — say “no page for allergen information” or “no UK stockist map”.
@@ -732,7 +732,7 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, t
       { role: 'user', content: prompt },
     ],
     temperature: 0.2,
-    max_tokens: 4000,
+    max_tokens: 2500,
   };
   try {
     const result = await postJson(endpoint, payload, timeout, { Authorization: `Bearer ${apiKey}` });
