@@ -85,7 +85,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const body = await readBody(req);
-  const { question, businessName, promptType } = body;
+  const { question, businessName, promptType, searchIntent } = body;
   if (!question) return res.status(400).json({ error: 'question is required' });
 
   const hasGroq = !!process.env.GROQ_API_KEY;
@@ -96,16 +96,27 @@ module.exports = async (req, res) => {
 
   // Brand audit mode — assess what AI knows about a specific brand
   if (promptType === 'brand_audit') {
-    const auditPrompt = `A person asked: "${question}"
+    const intentGuide = {
+      'brand recognition':     'Focus only on: what the brand is, when it was founded, what makes it distinctive. Do NOT describe products in detail.',
+      'product knowledge':     'Focus only on: specific named products, SKUs, flavours, or product lines. List as many specific products as you know. Do NOT give a general brand description.',
+      'availability':          'Focus only on: specific stockists, retailers, online channels, countries where available. Name specific stores. Do NOT describe the products.',
+      'comparison positioning':'Focus only on: how this brand compares to rivals — price positioning, quality, ingredients, target audience. Name specific competitors and concrete differences.',
+      'retail availability':   'Focus only on: specific UK supermarket chains that stock this brand, and whether it is nationwide or regional. Name the stores.',
+    }[searchIntent] || 'Answer only what was asked. Do not repeat the brand description.';
 
-Answer based on your training knowledge about this brand or company. Be factual and honest — say "unknown" if you don't have reliable information.
+    const auditPrompt = `You are being asked to audit what you know about a specific brand. Answer ONLY what is asked — do not open with "X is a company that makes..." as that is repetitive across questions.
+
+Question: "${question}"
+Focus: ${intentGuide}
+
+Be specific and factual. Use real names (products, stores, etc.). If you genuinely don't know, say so briefly.
 
 Return ONLY valid JSON:
 {
   "recognised": true or false,
-  "response": "2-3 sentence answer you would give the person",
-  "products_mentioned": ["specific product 1", "specific product 2"],
-  "channels_mentioned": ["where they sell e.g. Waitrose, Amazon, own website"],
+  "response": "2-4 sentences focused specifically on what was asked — no generic brand intro",
+  "products_mentioned": ["specific named products if relevant, else empty array"],
+  "channels_mentioned": ["specific retailers/channels if relevant, else empty array"],
   "confidence": "high or medium or low or unknown"
 }`;
 

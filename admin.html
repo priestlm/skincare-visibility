@@ -693,7 +693,7 @@ async function generateReport() {
     if (auditQuestions.length) {
       setStep('query', 'active', 'Running brand recognition audit…');
       const auditSettled = await Promise.allSettled(
-        auditQuestions.map(q => post('/api/ask', {question: q.question, businessName: orgName, promptType: 'brand_audit'}).then(r => r.json()))
+        auditQuestions.map(q => post('/api/ask', {question: q.question, businessName: orgName, promptType: 'brand_audit', searchIntent: q.search_intent}).then(r => r.json()))
       );
       auditSettled.forEach((res, i) => {
         const q = auditQuestions[i];
