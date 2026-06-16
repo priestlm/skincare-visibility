@@ -1558,6 +1558,7 @@ module.exports = async (req, res) => {
       ddgSummary: ddgSignal?.abstract || ddgSignal?.searchSnippets?.[0] || null,
       ddgTopics: ddgSignal?.topics || [],
       ddgInfobox: ddgSignal?.infobox || [],
+      _ddgSnippets: ddgSignal?.searchSnippets || [],
       brandAuditQuestions: buildBrandAuditQuestions(displayTitle, detectedNiche, CATEGORY_DEFS[primary]?.label),
     };
 
