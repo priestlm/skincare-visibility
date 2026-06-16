@@ -1481,15 +1481,17 @@ module.exports = async (req, res) => {
     };
   }
 
-  if (!weakEvidence) cacheSet(cacheKey, responseData);
+  if (!responseData.weakEvidence) cacheSet(cacheKey, responseData);
 
   res.status(200).json(responseData);
 
   // Save all questions to the store (fire-and-forget after response sent)
-  saveQuestionsToStore(
-    questionsRich,
-    primary,
-    detectedNiche,
-    ai.allowed_topics || []
-  ).catch(() => {});
+  if (responseData.questionsRich && responseData.primary) {
+    saveQuestionsToStore(
+      responseData.questionsRich,
+      responseData.primary,
+      responseData.niche,
+      (ai && ai.allowed_topics) || []
+    ).catch(() => {});
+  }
 };
