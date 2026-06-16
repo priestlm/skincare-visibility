@@ -679,47 +679,48 @@ async function callGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
-  // flash-lite = 30 RPM (vs flash 15 RPM) â€” use as primary to halve rate-limit exposure
-  const MODELS = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash'];
+  const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'];
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.2, maxOutputTokens: 4000 },
   };
 
-  let result, usedModel;
-  try {
-    for (const model of MODELS) {
+  for (const model of MODELS) {
+    try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      result = await postJson(endpoint, payload, 15000);
-      usedModel = model;
-      if (result.status === 200) break;
-      // On 429 or 404 try the next model; on other errors stop immediately
-      const bodyStr = JSON.stringify(result.body).slice(0, 400);
-      console.error(`Gemini ${model} error`, result.status, bodyStr);
-      if (result.status !== 429 && result.status !== 404) break;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 28000);
+      let res, body;
+      try {
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        body = await res.json();
+      } finally { clearTimeout(timer); }
+
+      if (res.status === 429 || res.status === 404) { console.warn(`Gemini ${model} ${res.status}`); continue; }
+      if (res.status !== 200) {
+        const detail = body?.error?.message || body?.error?.status || '';
+        console.error(`Gemini ${model} error ${res.status}:`, detail);
+        return { _error: `gemini_status_${res.status}`, _errorDetail: detail };
+      }
+      const text = body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (!parsed.primary_category || !parsed.example_ai_shopping_questions) {
+        console.error('Gemini missing fields'); return { _error: 'gemini_missing_fields' };
+      }
+      console.log(`Gemini model used: ${model}`);
+      return parsed;
+    } catch (err) {
+      console.error(`Gemini ${model} threw:`, err.message);
+      if (err.name === 'AbortError') { return { _error: 'timeout' }; }
     }
-
-    if (result.status !== 200) {
-      const errDetail = result.body?.error?.message || result.body?.error?.status || '';
-      return { _error: `api_status_${result.status}`, _errorDetail: errDetail };
-    }
-    console.log(`Gemini model used: ${usedModel}`);
-
-    const text = result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    // Strip any accidental markdown fences
-    const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-
-    // Validate required fields
-    if (!parsed.primary_category || !parsed.example_ai_shopping_questions) {
-      return { _error: 'missing_fields' };
-    }
-
-    return parsed;
-  } catch (err) {
-    console.error('Gemini call failed:', err.message);
-    return { _error: err.message || 'unknown' };
   }
+  return { _error: 'gemini_all_models_failed' };
 }
 
 // â”€â”€ OpenAI-compatible chat helper (used by Groq + OpenRouter) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -771,10 +772,9 @@ async function callOpenRouter(prompt) {
   const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
   const models = [
     'meta-llama/llama-3.1-8b-instruct:free',
-    'qwen/qwen3-8b:free',
-    'deepseek/deepseek-chat-v3-0324:free',
+    'google/gemma-3-12b-it:free',
     'mistralai/mistral-7b-instruct:free',
-    'deepseek/deepseek-r1:free',
+    'qwen/qwen2.5-7b-instruct:free',
   ];
   let lastErr;
   for (const model of models) {
