@@ -122,7 +122,7 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
 /* ===================================================
    REPORT DOCUMENT TEMPLATE (light, printable)
    =================================================== */
-.rpt-doc{max-width:920px;margin:0 auto;padding:0 0 80px;font-family:'DM Sans',sans-serif;font-size:14px;color:#1F2937;line-height:1.6}
+.rpt-doc{max-width:920px;margin:0 auto;padding:0 0 80px;font-family:'DM Sans',sans-serif;font-size:15px;color:#1F2937;line-height:1.7}
 
 /* Cover */
 .rpt-cover{background:linear-gradient(140deg,#060810 0%,#1a1040 55%,#081428 100%);color:#EEF2FF;padding:52px 56px 44px;position:relative;overflow:hidden}
@@ -219,13 +219,13 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
 .rpt-footer-logo .logo-icon{width:20px;height:20px;border-radius:5px}
 
 /* ── Executive Q&A section ── */
-.exec-qa{display:flex;flex-direction:column;gap:0;margin-top:20px}
-.exec-qa-row{display:grid;grid-template-columns:220px 1fr;gap:0;border-bottom:1px solid #E5E7EB;padding:14px 0}
+.exec-qa{display:flex;flex-direction:column;gap:0;margin-top:24px}
+.exec-qa-row{display:grid;grid-template-columns:200px 1fr;gap:24px;border-bottom:1px solid #E0E7FF;padding:20px 0}
 .exec-qa-row:first-child{padding-top:0}
 .exec-qa-row:last-child{border-bottom:none;padding-bottom:0}
-.exec-qa-q{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:#9CA3AF;padding-right:20px;line-height:1.5;padding-top:2px}
-.exec-qa-a{font-size:14px;color:#111827;font-weight:500;line-height:1.6}
-.exec-qa-a .sub{font-size:13px;color:#6B7280;font-weight:400;margin-top:3px}
+.exec-qa-q{font-size:12.5px;font-weight:600;color:#64748B;padding-right:8px;line-height:1.55;padding-top:3px}
+.exec-qa-a{font-size:15.5px;color:#111827;font-weight:600;line-height:1.58}
+.exec-qa-a .sub{font-size:13.5px;color:#6B7280;font-weight:400;margin-top:6px;line-height:1.6;padding:8px 12px;background:rgba(255,255,255,.6);border-radius:6px;border-left:3px solid #C7D2FE}
 
 /* ── Visibility snapshot (3-column) ── */
 .snap-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#E5E7EB;border-radius:12px;overflow:hidden;margin-top:4px}
@@ -313,10 +313,22 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
 .gen-progress-wrap{width:100%;max-width:460px;background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;margin-top:8px}
 .gen-progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-w));border-radius:6px;transition:width .3s}
 
+/* ── Cover signals strip ── */
+.cover-signals{display:flex;gap:0;margin-top:32px;padding-top:24px;border-top:1px solid rgba(255,255,255,.1);flex-wrap:wrap}
+.cover-sig{padding:0 28px 0 0;margin-right:28px;border-right:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;gap:5px}
+.cover-sig:last-child{border-right:none}
+.cover-sig-lbl{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:rgba(238,242,255,.38)}
+.cover-sig-val{font-size:14px;font-weight:600;color:rgba(238,242,255,.88)}
+.cover-sig-val.sig-green{color:#4ADE80}
+.cover-sig-val.sig-amber{color:#FB923C}
+.cover-vis-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.08);margin-top:16px;gap:2px}
+.cvb-appeared{background:#4ADE80;border-radius:3px 0 0 3px;transition:width .3s}
+.cvb-missed{background:#F87171;border-radius:0 3px 3px 0;transition:width .3s}
+
 /* ── Executive Summary ── */
-.exec-summary{padding:28px 56px 24px;background:linear-gradient(135deg,#F0F9FF 0%,#EEF2FF 100%);border-bottom:3px solid #E0E7FF}
-.exec-tier{display:flex;align-items:center;gap:12px;margin-bottom:6px}
-.exec-tier-name{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:#111827}
+.exec-summary{padding:32px 56px 28px;background:linear-gradient(135deg,#F0F9FF 0%,#EEF2FF 100%);border-bottom:3px solid #E0E7FF}
+.exec-tier{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.exec-tier-name{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;color:#111827}
 .tier-badge{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.16em;font-weight:700;padding:4px 10px;border-radius:5px;text-transform:uppercase;flex:none}
 .tier-badge.strong{background:#ECFDF5;color:#059669;border:1px solid #6EE7B7}
 .tier-badge.moderate{background:#FFFBEB;color:#D97706;border:1px solid #FDE68A}
@@ -1423,10 +1435,23 @@ function renderReport(r) {
       <div class="cover-score">
         <div class="gauge-wrap">${gauge}<div class="gauge-lbl">AI Visibility Score</div></div>
         <div class="score-stats">
-          <div class="score-stat"><div class="score-stat-n">${mentionCount}/${strongResults.length}</div><div class="score-stat-l">appearances in reliable results</div></div>
-          <div class="score-stat"><div class="score-stat-n">${uncertainResults.length}</div><div class="score-stat-l">uncertain / excluded results</div></div>
+          <div class="score-stat"><div class="score-stat-n">${mentionCount}/${strongResults.length}</div><div class="score-stat-l">queries where brand appeared</div></div>
+          <div class="score-stat"><div class="score-stat-n">${missedResults.length}</div><div class="score-stat-l">queries won by competitors</div></div>
           <div class="score-interp" style="grid-column:1/-1">${x(coverInterp)}</div>
+          <div style="grid-column:1/-1">
+            <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:rgba(238,242,255,.35);text-transform:uppercase;margin-bottom:5px"><span>Appeared</span><span>Missed</span></div>
+            <div class="cover-vis-bar">
+              <div class="cvb-appeared" style="width:${strongResults.length > 0 ? Math.round(mentionCount/strongResults.length*100) : 0}%"></div>
+              <div class="cvb-missed" style="width:${strongResults.length > 0 ? Math.round(missedResults.length/strongResults.length*100) : 0}%"></div>
+            </div>
+          </div>
         </div>
+      </div>
+      <div class="cover-signals">
+        ${confirmedComps.length ? `<div class="cover-sig"><span class="cover-sig-lbl">Leading competitor</span><span class="cover-sig-val">${x(confirmedComps[0].name)} · ${confirmedComps[0].count}/${totalQ} queries</span></div>` : topCompetitors.length ? `<div class="cover-sig"><span class="cover-sig-lbl">Most seen competitor</span><span class="cover-sig-val">${x(topCompetitors[0].name)}</span></div>` : ''}
+        ${auditResults.length ? `<div class="cover-sig"><span class="cover-sig-lbl">Brand footprint</span><span class="cover-sig-val ${brandRecognised ? 'sig-green' : 'sig-amber'}">${brandRecognised ? 'AI recognises this brand' : 'Low AI recognition'}</span></div>` : ''}
+        ${auditKnownProducts.length ? `<div class="cover-sig"><span class="cover-sig-lbl">Products AI knows</span><span class="cover-sig-val">${auditKnownProducts.slice(0,2).map(p=>x(p)).join(', ')}${auditKnownProducts.length > 2 ? ' +' + (auditKnownProducts.length-2) + ' more' : ''}</span></div>` : ''}
+        ${auditKnownChannels.length ? `<div class="cover-sig"><span class="cover-sig-lbl">Known stockists</span><span class="cover-sig-val">${auditKnownChannels.slice(0,3).map(c=>x(c)).join(', ')}</span></div>` : ''}
       </div>
       ${deltaHtml}
     </div>
