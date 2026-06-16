@@ -459,31 +459,58 @@ async function fetchDDGInstant(query) {
 // DDG HTML search — scrape result snippets for brands with no entity page
 async function fetchDDGSearch(query) {
   try {
+    const zlib = require('zlib');
     const q = encodeURIComponent(query);
     const url = `https://html.duckduckgo.com/html/?q=${q}&kl=uk-en`;
     const html = await new Promise((resolve, reject) => {
-      https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research-bot/1.0)', 'Accept-Language': 'en-GB' } }, (res) => {
-        let raw = '';
-        res.setEncoding('utf8');
-        res.on('data', c => { raw += c; });
-        res.on('end', () => resolve(raw));
+      https.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html',
+          'Accept-Language': 'en-GB,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate',
+        },
+      }, (res) => {
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => {
+          const buf = Buffer.concat(chunks);
+          const enc = res.headers['content-encoding'];
+          if (enc === 'gzip') {
+            zlib.gunzip(buf, (err, decoded) => {
+              if (err) resolve(buf.toString('utf8'));
+              else resolve(decoded.toString('utf8'));
+            });
+          } else if (enc === 'deflate') {
+            zlib.inflate(buf, (err, decoded) => {
+              if (err) resolve(buf.toString('utf8'));
+              else resolve(decoded.toString('utf8'));
+            });
+          } else {
+            resolve(buf.toString('utf8'));
+          }
+        });
       }).setTimeout(8000, function() { this.destroy(); reject(new Error('timeout')); })
         .on('error', reject);
     });
-    // Extract result snippets from DDG HTML — look for <a class="result__snippet"> text content
+
+    function decodeHtml(s) {
+      return s.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');
+    }
+
     const snippets = [];
-    const snippetRe = /<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    const titles = [];
+    // Match snippets: text after result__snippet until </a>
+    const snippetRe = /result__snippet[^>]*>([\s\S]{0,400}?)<\/a>/g;
     let m;
     while ((m = snippetRe.exec(html)) !== null && snippets.length < 6) {
-      const text = m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+      const text = decodeHtml(m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
       if (text.length > 30) snippets.push(text);
     }
-    // Also extract result titles for context
-    const titles = [];
-    const titleRe = /<a[^>]+class="[^"]*result__a[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    const titleRe = /result__a[^>]*>([\s\S]{0,200}?)<\/a>/g;
     while ((m = titleRe.exec(html)) !== null && titles.length < 5) {
-      const text = m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-      if (text.length > 5) titles.push(text);
+      const text = decodeHtml(m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
+      if (text.length > 5 && !text.startsWith('http')) titles.push(text);
     }
     return snippets.length ? { snippets, titles } : null;
   } catch { return null; }
