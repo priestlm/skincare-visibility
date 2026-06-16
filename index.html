@@ -1726,13 +1726,9 @@
 
       setTimeout(function () {
         if (data.needsManualCategory) {
-          if (data.analysis_status === 'blocked') {
-            document.getElementById('fallback-detail').textContent =
-              'Some larger retailers block automated previews. We can still prepare an initial preview from the domain and category signals — and the full Starter Report includes a manual check.';
-          } else {
-            document.getElementById('fallback-detail').textContent =
-              'This sometimes happens with sites using JavaScript rendering or bot protection.';
-          }
+          if (data.aiError) console.warn('AI analysis error:', data.aiError);
+          document.getElementById('fallback-detail').textContent =
+            'We weren\'t able to automatically classify this site right now. Select your business category below and we\'ll generate a preview — the full Starter Report includes a manual review.';
           showStep('step-fallback');
         } else {
           renderResult(data, rawUrl, brandName, market);
