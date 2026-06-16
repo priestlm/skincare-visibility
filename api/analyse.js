@@ -919,19 +919,21 @@ async function callAI(extracted, targetUrl, analysisStatus, ddgSignal, userLocat
 
   // Gemini primary — works from Vercel IPs, free tier
   const geminiResult = await callGemini(prompt);
+  console.log('Gemini result:', geminiResult ? JSON.stringify({ _error: geminiResult._error, _errorDetail: geminiResult._errorDetail }).slice(0,200) : 'null (no key)');
   if (geminiResult && !geminiResult._error) return geminiResult;
-  console.warn('Gemini failed:', geminiResult?._error);
 
   // OpenRouter fallback — free tier
   const openRouterResult = await callOpenRouter(prompt);
+  console.log('OpenRouter result:', openRouterResult ? JSON.stringify({ _error: openRouterResult._error }).slice(0,200) : 'null (no key)');
   if (openRouterResult && !openRouterResult._error) return openRouterResult;
-  console.warn('OpenRouter failed:', openRouterResult?._error);
 
   // Groq last resort (blocked on Vercel but worth trying)
   const groqResult = await callGroq(prompt);
+  console.log('Groq result:', groqResult ? JSON.stringify({ _error: groqResult._error }).slice(0,200) : 'null (no key)');
   if (groqResult && !groqResult._error) return groqResult;
 
-  return groqResult || openRouterResult || geminiResult || { _error: 'no_ai_provider' };
+  const lastErr = groqResult || openRouterResult || geminiResult || { _error: 'no_ai_provider' };
+  return { ...lastErr, _allErrors: { gemini: geminiResult?._error || 'null', openrouter: openRouterResult?._error || 'null', groq: groqResult?._error || 'null' } };
 }
 
 // â”€â”€ Niche question templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1472,7 +1474,7 @@ module.exports = async (req, res) => {
 
     responseData = {
       fetchedOk: false, needsManualCategory: false, analysis_status: 'ok',
-      aiAssisted: false, manual: false, _aiError: aiRaw?._error, _aiDetail: aiRaw?._errorDetail,
+      aiAssisted: false, manual: false, _aiError: aiRaw?._error, _aiDetail: aiRaw?._errorDetail, _allErrors: aiRaw?._allErrors,
       title: displayTitle, organisationName: displayTitle, summary,
       primary, niche: null,
       productsFound: false, productsStructured: [], customerChannels: [], publicSignals: [], visibilityGaps: [],
