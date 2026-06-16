@@ -597,7 +597,7 @@ function postJson(url, payload, timeout = 12000, extraHeaders = {}) {
   });
 }
 
-function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal) {
+function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLocation) {
   const ddgBlock = ddgSignal ? [
     ddgSignal.heading  ? `Brand: ${ddgSignal.heading}` : '',
     ddgSignal.entity   ? `Entity type: ${ddgSignal.entity}` : '',
@@ -609,6 +609,10 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal) {
   const signalsBlock = ddgBlock
     ? `URL: ${targetUrl}\n\n${ddgBlock}`
     : `URL: ${targetUrl}\nNo external data found — use your training knowledge about this brand.`;
+
+  const locationHint = userLocation
+    ? `\nUser location: ${[userLocation.town, userLocation.county, userLocation.country].filter(Boolean).join(', ')}`
+    : '';
 
   return `You are a brand analyst. Analyse the brand signals below and return ONLY a valid JSON object — no markdown, no code fences, no explanation. Keep all string values under 25 words.
 
@@ -644,7 +648,10 @@ RULES:
    GOOD: “what's the best nut butter for smoothies?” / “where can I buy almond butter online in the UK?” / “is almond butter good for weight loss?”
    BAD: “find me award-winning nut butters” / “recommend a premium natural nut butter brand”
 4. Do NOT write questions about categories not relevant to this brand.
-5. Generate AT LEAST 20 questions. Spread across: discovery(4+), specific_product(4+), comparison(3+), occasion(2+), gift(2+), awareness(2+), location(2+). Aim for 22-25.
+5. Generate AT LEAST 22 questions covering DIFFERENT angles — no two questions should have the same core intent.
+   Required spread: discovery(4+), specific_product(4+), comparison(3+), occasion(2+), gift(2+), awareness(2+), location(2+).
+   DIVERSITY RULE: Each question must ask about a genuinely different product, use-case, or audience. Do NOT generate variations like “best X for Y” and “top X for Y” — they count as one question.${userLocation ? `
+   LOCATION RULE: Include at least 3 location questions using “${[userLocation.town, userLocation.county].filter(Boolean).join('” or “')}” as the named place. Examples: “best [service] in ${userLocation.town}”, “where can I find [product] near ${userLocation.town}”, “[service] near ${userLocation.town} recommendations”.` : ''}
 6. visibility_gaps: name actual product types, page types, or information a buyer would want. Not “add more content” — say “no page for allergen information” or “no UK stockist map”.
 
 prompt_type definitions:
@@ -660,7 +667,7 @@ prompt_type definitions:
 Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
 
 Brand signals:
-${signalsBlock}`;
+${signalsBlock}${locationHint}`;
 }
 
 async function callGemini(prompt) {
@@ -872,8 +879,8 @@ Return ONLY a valid JSON array of strings:
 }
 
 // â”€â”€ AI orchestrator: Groq â†' OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function callAI(extracted, targetUrl, analysisStatus, ddgSignal) {
-  const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal);
+async function callAI(extracted, targetUrl, analysisStatus, ddgSignal, userLocation) {
+  const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLocation);
 
   // Groq primary — fast, free
   const groqResult = await callGroq(prompt);
@@ -1265,6 +1272,27 @@ function buildBrandAuditQuestions(orgName, niche, categoryLabel) {
   ];
 }
 
+// ── Semantic deduplication ────────────────────────────────────────────────────
+const DEDUP_STOP = new Set(['what','where','which','who','how','can','the','a','an','is','are','do','does','for','in','to','of','and','or','on','at','my','me','i','best','good','great','any','some','near','from','with','about','will','get','buy','find','need','like']);
+
+function dedupQuestions(qs) {
+  function sigWords(q) {
+    return new Set(q.toLowerCase().replace(/[^\w\s]/g,' ').split(/\s+/).filter(w => w.length > 2 && !DEDUP_STOP.has(w)));
+  }
+  const kept = [];
+  for (const q of qs) {
+    const sw = sigWords(q.question);
+    if (sw.size === 0) { kept.push(q); continue; }
+    const isDup = kept.some(k => {
+      const ks = sigWords(k.question);
+      const overlap = [...sw].filter(w => ks.has(w)).length;
+      return overlap / Math.min(sw.size, ks.size) >= 0.65;
+    });
+    if (!isDup) kept.push(q);
+  }
+  return kept;
+}
+
 // â”€â”€ In-memory result cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Persists across warm invocations of the same serverless instance.
 // Prevents repeated Gemini calls for the same URL within a warm window.
@@ -1294,7 +1322,8 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const body = await readBody(req);
-  let { url: targetUrl, brandName = '', market = 'UK', manualCategory } = body;
+  let { url: targetUrl, brandName = '', market = 'UK', manualCategory, userLocation } = body;
+  // userLocation: { town, county, country } — optional, from browser geolocation
   if (!targetUrl) return res.status(400).json({ error: 'url is required' });
   if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
 
@@ -1341,7 +1370,7 @@ module.exports = async (req, res) => {
   if (override && override.summary) extracted.metaDesc = override.summary;
 
   // Call AI with DDG signal — no site scraping
-  const aiRaw = await callAI(extracted, targetUrl, 'ok', ddgSignal);
+  const aiRaw = await callAI(extracted, targetUrl, 'ok', ddgSignal, userLocation);
   const ai = aiRaw && !aiRaw._error ? aiRaw : null;
 
   if (!ai) {
@@ -1359,6 +1388,10 @@ module.exports = async (req, res) => {
     brandName: aiBrand, organisationName, summary, customerType,
     detectedNiche, productsFound, productsStructured,
     customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
+
+  // Deduplicate similar questions before top-up
+  questionsRich = dedupQuestions(questionsRich);
+  questions = questionsRich.map(q => q.question);
 
   // Top-up: if AI gave fewer than 20 questions after filtering, ask for more
   const MIN_QUESTIONS = 20;

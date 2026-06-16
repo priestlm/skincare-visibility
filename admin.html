@@ -632,6 +632,27 @@ async function fetchQuery(question, intent, promptType, orgName, attempt = 0) {
   }
 }
 
+async function detectUserLocation() {
+  if (!navigator.geolocation) return null;
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, maximumAge: 3600000 });
+    });
+    const { latitude, longitude } = pos.coords;
+    const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`, {
+      headers: { 'User-Agent': 'visible-ai-report/1.0' }
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const addr = data.address || {};
+    return {
+      town: addr.town || addr.city || addr.village || addr.hamlet || '',
+      county: addr.county || addr.state_district || '',
+      country: addr.country_code ? addr.country_code.toUpperCase() : (addr.country || ''),
+    };
+  } catch { return null; }
+}
+
 async function generateReport() {
   const url = document.getElementById('gen-url').value.trim();
   if (!url) { document.getElementById('gen-url').focus(); return; }
@@ -664,9 +685,12 @@ async function generateReport() {
   }, 3000);
 
   try {
+    // Detect user location (non-blocking — silently skipped if denied/unavailable)
+    const userLocation = await detectUserLocation();
+
     // Step 1 — analyse
     setStep('analyse', 'active', analyseMessages[0]);
-    const ar = await post('/api/analyse', {url, brandName: brand, market});
+    const ar = await post('/api/analyse', {url, brandName: brand, market, userLocation});
     clearInterval(analyseTicker);
     if (!ar.ok) throw new Error('Analysis failed (' + ar.status + ')');
     const analysis = await ar.json();
