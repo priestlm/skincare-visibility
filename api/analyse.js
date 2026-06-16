@@ -422,7 +422,19 @@ const CUSTOMER_TYPES = {
 };
 
 // â”€â”€ HTTP fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function fetchDuckDuckGo(query) {
+// Extract a clean brand name from a hostname: "seasaltcornwall.com" → "Seasalt Cornwall"
+function brandFromHostname(hostname) {
+  const h = hostname.replace(/^www\./, '').replace(/\.(co\.uk|com\.au|org\.uk|com|org|net|co|uk|io|store|shop)$/i, '');
+  // Split on hyphens/underscores, then try to split concatenated words via common patterns
+  const words = h.split(/[-_]/).flatMap(part => {
+    // Split CamelCase: "SeaSalt" → ["Sea", "Salt"]
+    return part.replace(/([a-z])([A-Z])/g, '$1 $2').split(' ');
+  });
+  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// DDG Instant Answers API — returns Wikipedia/Wikidata entity data
+async function fetchDDGInstant(query) {
   try {
     const q = encodeURIComponent(query);
     const url = `https://api.duckduckgo.com/?q=${q}&format=json&no_redirect=1&no_html=1&skip_disambig=1`;
@@ -437,20 +449,71 @@ async function fetchDuckDuckGo(query) {
     });
     if (!data) return null;
     const abstract = (data.AbstractText || '').trim();
-    const topics = (data.RelatedTopics || [])
-      .filter(t => t.Text && !t.Topics)
-      .slice(0, 6)
-      .map(t => t.Text);
-    const infobox = (data.Infobox?.content || [])
-      .filter(i => i.label && i.value)
-      .slice(0, 8)
-      .map(i => `${i.label}: ${i.value}`);
+    const topics = (data.RelatedTopics || []).filter(t => t.Text && !t.Topics).slice(0, 6).map(t => t.Text);
+    const infobox = (data.Infobox?.content || []).filter(i => i.label && i.value).slice(0, 8).map(i => `${i.label}: ${i.value}`);
     if (!abstract && !topics.length && !infobox.length) return null;
     return { abstract, topics, infobox, entity: data.Entity || '', heading: data.Heading || '' };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
+
+// DDG HTML search — scrape result snippets for brands with no entity page
+async function fetchDDGSearch(query) {
+  try {
+    const q = encodeURIComponent(query);
+    const url = `https://html.duckduckgo.com/html/?q=${q}&kl=uk-en`;
+    const html = await new Promise((resolve, reject) => {
+      https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; research-bot/1.0)', 'Accept-Language': 'en-GB' } }, (res) => {
+        let raw = '';
+        res.setEncoding('utf8');
+        res.on('data', c => { raw += c; });
+        res.on('end', () => resolve(raw));
+      }).setTimeout(8000, function() { this.destroy(); reject(new Error('timeout')); })
+        .on('error', reject);
+    });
+    // Extract result snippets from DDG HTML — look for <a class="result__snippet"> text content
+    const snippets = [];
+    const snippetRe = /<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    let m;
+    while ((m = snippetRe.exec(html)) !== null && snippets.length < 6) {
+      const text = m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+      if (text.length > 30) snippets.push(text);
+    }
+    // Also extract result titles for context
+    const titles = [];
+    const titleRe = /<a[^>]+class="[^"]*result__a[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    while ((m = titleRe.exec(html)) !== null && titles.length < 5) {
+      const text = m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (text.length > 5) titles.push(text);
+    }
+    return snippets.length ? { snippets, titles } : null;
+  } catch { return null; }
+}
+
+// Merge DDG instant + search signals into one rich object
+function mergeDDGSignals(instant, search, brandGuess) {
+  const snippetText = search?.snippets?.join(' ') || '';
+  const titleText = search?.titles?.join(' ') || '';
+  return {
+    heading: instant?.heading || brandGuess || '',
+    entity: instant?.entity || '',
+    abstract: instant?.abstract || (search?.snippets?.[0] || ''),
+    topics: instant?.topics || [],
+    infobox: instant?.infobox || [],
+    searchSnippets: search?.snippets || [],
+    searchTitles: search?.titles || [],
+    // Combined text blob for AI and keyword scoring
+    richText: [
+      instant?.abstract || '',
+      instant?.topics?.join(' ') || '',
+      instant?.infobox?.join(' ') || '',
+      snippetText,
+      titleText,
+    ].filter(Boolean).join(' '),
+  };
+}
+
+// Legacy wrapper used elsewhere
+async function fetchDuckDuckGo(query) { return fetchDDGInstant(query); }
 
 function fetchHtml(rawUrl, timeout = 9000, redirectsLeft = 3) {
   return new Promise((resolve, reject) => {
@@ -603,8 +666,12 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLoca
     ddgSignal.heading  ? `Brand: ${ddgSignal.heading}` : '',
     ddgSignal.entity   ? `Entity type: ${ddgSignal.entity}` : '',
     ddgSignal.abstract ? `Overview: ${ddgSignal.abstract}` : '',
-    ddgSignal.infobox && ddgSignal.infobox.length ? `Key facts: ${ddgSignal.infobox.join(' | ')}` : '',
-    ddgSignal.topics && ddgSignal.topics.length   ? `Related topics: ${ddgSignal.topics.slice(0, 4).join(' | ')}` : '',
+    ddgSignal.infobox && ddgSignal.infobox.length
+      ? `Key facts: ${ddgSignal.infobox.join(' | ')}` : '',
+    ddgSignal.topics && ddgSignal.topics.length
+      ? `Related topics: ${ddgSignal.topics.slice(0, 4).join(' | ')}` : '',
+    ddgSignal.searchSnippets && ddgSignal.searchSnippets.length
+      ? `Search result snippets:\n${ddgSignal.searchSnippets.slice(0, 5).map(s => `  - ${s}`).join('\n')}` : '',
   ].filter(Boolean).join('\n') : '';
 
   const signalsBlock = ddgBlock
@@ -892,10 +959,12 @@ Return ONLY a valid JSON array of strings:
 function categorizeDDG(ddgSignal, targetUrl, brandNameHint) {
   const hostname = (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, '').replace(/[\-_.]/g, ' '); } catch { return ''; } })();
   const text = [
+    ddgSignal?.richText || '',
     ddgSignal?.abstract || '',
     ddgSignal?.heading || '',
     (ddgSignal?.topics || []).join(' '),
     (ddgSignal?.infobox || []).join(' '),
+    (ddgSignal?.searchSnippets || []).join(' '),
     brandNameHint || '',
     hostname,
   ].join(' ').toLowerCase();
@@ -1403,9 +1472,16 @@ module.exports = async (req, res) => {
   const fetchedOk = false;
   const analysisStatus = 'ok';
 
-  // DuckDuckGo is the sole brand research source — no site scraping
-  const ddgQuery = (brandName || '') + (brandName ? ' brand products UK' : new URL(targetUrl).hostname.replace(/^www\./, '') + ' brand UK');
-  const ddgSignal = await fetchDuckDuckGo(ddgQuery);
+  // Multi-signal DDG research — parallel instant answers + HTML search snippets
+  const hostname = (() => { try { return new URL(targetUrl).hostname; } catch { return ''; } })();
+  const brandGuess = brandName || brandFromHostname(hostname);
+  const [ddgInstant, ddgInstant2, ddgSearch] = await Promise.all([
+    fetchDDGInstant(brandGuess),
+    fetchDDGInstant(brandGuess + ' brand'),
+    fetchDDGSearch(brandGuess + ' company products'),
+  ]);
+  const instantBest = ddgInstant?.abstract ? ddgInstant : (ddgInstant2?.abstract ? ddgInstant2 : null);
+  const ddgSignal = mergeDDGSignals(instantBest, ddgSearch, brandGuess);
 
   // AI generates brand-specific questions using DDG data as context
   const aiRaw = await callAI({ title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' }, targetUrl, 'ok', ddgSignal, userLocation);
@@ -1452,7 +1528,7 @@ module.exports = async (req, res) => {
       categories: categoryLabels, customerType,
       questions, questionsRich, weakEvidence, riskNarrative,
       confidence: ai.confidence_score,
-      ddgSummary: ddgSignal?.abstract || null,
+      ddgSummary: ddgSignal?.abstract || ddgSignal?.searchSnippets?.[0] || null,
       ddgTopics: ddgSignal?.topics || [],
       ddgInfobox: ddgSignal?.infobox || [],
       brandAuditQuestions: buildBrandAuditQuestions(displayTitle, detectedNiche, CATEGORY_DEFS[primary]?.label),
@@ -1479,7 +1555,7 @@ module.exports = async (req, res) => {
       questions: rawQuestions, questionsRich, weakEvidence,
       riskNarrative: buildRiskNarrative(displayTitle, primary, categories),
       confidence: weakEvidence ? 0.4 : 0.7,
-      ddgSummary: ddgSignal?.abstract || null,
+      ddgSummary: ddgSignal?.abstract || ddgSignal?.searchSnippets?.[0] || null,
       ddgTopics: ddgSignal?.topics || [],
       ddgInfobox: ddgSignal?.infobox || [],
       brandAuditQuestions: buildBrandAuditQuestions(displayTitle, null, CATEGORY_DEFS[primary]?.label),
