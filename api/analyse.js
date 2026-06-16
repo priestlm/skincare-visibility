@@ -1402,39 +1402,84 @@ module.exports = async (req, res) => {
   const ddgQuery = (brandName || '') + (brandName ? ' brand products UK' : new URL(targetUrl).hostname.replace(/^www\./, '') + ' brand UK');
   const ddgSignal = await fetchDuckDuckGo(ddgQuery);
 
-  // DDG-only categorization — no AI call needed
-  const { primary, categories, weak: weakEvidence } = categorizeDDG(ddgSignal, targetUrl, brandName);
+  // AI generates brand-specific questions using DDG data as context
+  const aiRaw = await callAI({ title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' }, targetUrl, 'ok', ddgSignal, userLocation);
+  const ai = aiRaw && !aiRaw._error ? aiRaw : null;
 
-  const displayTitle = ddgSignal?.heading || brandName || new URL(targetUrl).hostname.replace(/^www\./, '');
-  const summary = ddgSignal?.abstract
-    ? ddgSignal.abstract
-    : `Visibility preview for ${displayTitle} based on category signals.`;
+  let responseData;
 
-  const rawQuestions = buildQuestions(categories);
-  const questionsRich = rawQuestions.map(q => ({ question: q, search_intent: '', prompt_type: 'discovery' }));
-  const questions = rawQuestions;
+  if (ai) {
+    // AI succeeded — use its categorization + brand-specific questions
+    const mapped = applyGeminiResult(ai, brandName || '');
+    let { primaryKey: primary, categories, questions, questionsRich, weakEvidence,
+      brandName: aiBrand, organisationName, summary, customerType,
+      detectedNiche, productsFound, productsStructured,
+      customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
 
-  const customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
-  const riskNarrative = buildRiskNarrative(displayTitle, primary, categories);
-  const categoryLabels = categories.map(c => ({
-    key: c, label: CATEGORY_DEFS[c]?.label || c, primary: c === primary,
-  }));
+    questionsRich = dedupQuestions(questionsRich);
+    questions = questionsRich.map(q => q.question);
 
-  const responseData = {
-    fetchedOk: false, needsManualCategory: false, analysis_status: 'ok',
-    aiAssisted: false, manual: false,
-    title: displayTitle, organisationName: displayTitle, summary,
-    primary, niche: null,
-    productsFound: false, productsStructured: [], customerChannels: [], publicSignals: [], visibilityGaps: [],
-    locationSignals: null,
-    categories: categoryLabels, customerType,
-    questions, questionsRich, weakEvidence, riskNarrative,
-    confidence: weakEvidence ? 0.4 : 0.7,
-    ddgSummary: ddgSignal?.abstract || null,
-    ddgTopics: ddgSignal?.topics || [],
-    ddgInfobox: ddgSignal?.infobox || [],
-    brandAuditQuestions: buildBrandAuditQuestions(displayTitle, null, CATEGORY_DEFS[primary]?.label),
-  };
+    const MIN_QUESTIONS = 20;
+    if (questionsRich.length < MIN_QUESTIONS) {
+      const brandPhrases = [organisationName, aiBrand, brandName]
+        .map(s => (s || '').toLowerCase().trim()).filter(s => s.length > 3);
+      const needed = MIN_QUESTIONS - questionsRich.length;
+      const extra = await topUpQuestions(ai, questionsRich, brandPhrases, primary, needed + 3);
+      const combined = [...questionsRich, ...extra.slice(0, needed)];
+      questionsRich = combined;
+      questions = combined.map(q => q.question);
+      weakEvidence = combined.length < 3;
+    }
+
+    const displayTitle = organisationName || aiBrand || brandName || targetUrl;
+    const riskNarrative = buildRiskNarrative(displayTitle, primary, categories);
+    const categoryLabels = categories.map(c => ({
+      key: c, label: CATEGORY_DEFS[c]?.label || c, primary: c === primary,
+    }));
+
+    responseData = {
+      fetchedOk: false, needsManualCategory: false, analysis_status: 'ok',
+      aiAssisted: true, manual: false,
+      title: displayTitle, organisationName: organisationName || null, summary,
+      primary, niche: detectedNiche || null,
+      productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps,
+      locationSignals: locationSignals || null,
+      categories: categoryLabels, customerType,
+      questions, questionsRich, weakEvidence, riskNarrative,
+      confidence: ai.confidence_score,
+      ddgSummary: ddgSignal?.abstract || null,
+      ddgTopics: ddgSignal?.topics || [],
+      ddgInfobox: ddgSignal?.infobox || [],
+      brandAuditQuestions: buildBrandAuditQuestions(displayTitle, detectedNiche, CATEGORY_DEFS[primary]?.label),
+    };
+
+  } else {
+    // AI failed — fall back to DDG keyword categorization + template questions (no manual category screen)
+    console.warn('AI failed, falling back to DDG categorization:', aiRaw?._error);
+    const { primary, categories, weak: weakEvidence } = categorizeDDG(ddgSignal, targetUrl, brandName);
+    const displayTitle = ddgSignal?.heading || brandName || new URL(targetUrl).hostname.replace(/^www\./, '');
+    const summary = ddgSignal?.abstract || `Visibility preview for ${displayTitle} based on category signals.`;
+    const rawQuestions = buildQuestions(categories);
+    const questionsRich = rawQuestions.map(q => ({ question: q, search_intent: '', prompt_type: 'discovery' }));
+    const categoryLabels = categories.map(c => ({ key: c, label: CATEGORY_DEFS[c]?.label || c, primary: c === primary }));
+
+    responseData = {
+      fetchedOk: false, needsManualCategory: false, analysis_status: 'ok',
+      aiAssisted: false, manual: false,
+      title: displayTitle, organisationName: displayTitle, summary,
+      primary, niche: null,
+      productsFound: false, productsStructured: [], customerChannels: [], publicSignals: [], visibilityGaps: [],
+      locationSignals: null,
+      categories: categoryLabels, customerType: CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other,
+      questions: rawQuestions, questionsRich, weakEvidence,
+      riskNarrative: buildRiskNarrative(displayTitle, primary, categories),
+      confidence: weakEvidence ? 0.4 : 0.7,
+      ddgSummary: ddgSignal?.abstract || null,
+      ddgTopics: ddgSignal?.topics || [],
+      ddgInfobox: ddgSignal?.infobox || [],
+      brandAuditQuestions: buildBrandAuditQuestions(displayTitle, null, CATEGORY_DEFS[primary]?.label),
+    };
+  }
 
   if (!weakEvidence) cacheSet(cacheKey, responseData);
 
