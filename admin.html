@@ -448,6 +448,48 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
 .tracking-cta p{font-size:14px;color:#3730A3;font-weight:600;margin-bottom:6px}
 .tracking-cta small{font-size:12.5px;color:#6B7280;line-height:1.65;display:block}
 
+/* ── Intent Coverage Matrix ── */
+.intent-matrix{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+.intent-matrix th{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#9CA3AF;padding:8px 12px;text-align:left;border-bottom:1px solid #E5E7EB;font-weight:600}
+.intent-matrix td{padding:10px 12px;border-bottom:1px solid #F9FAFB;vertical-align:middle}
+.intent-matrix tr:last-child td{border-bottom:none}
+.intent-matrix tr:hover td{background:#FAFBFF}
+.intent-type-name{font-weight:600;font-size:13.5px;color:#1F2937;display:block;margin-bottom:2px}
+.intent-type-desc{font-size:12px;color:#9CA3AF;font-style:italic}
+.intent-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:#F3F4F6;min-width:80px;gap:1px}
+.intent-bar-appeared{background:#10B981;border-radius:4px 0 0 4px}
+.intent-bar-missed{background:#EF4444}
+.intent-bar-uncertain{background:#D1D5DB;border-radius:0 4px 4px 0}
+.intent-bar-full{border-radius:4px}
+.intent-count{font-family:'JetBrains Mono',monospace;font-size:11px;color:#6B7280;margin-top:3px}
+.intent-status{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;font-weight:700;padding:3px 9px;border-radius:4px;text-transform:uppercase;white-space:nowrap}
+.status-winning{background:#ECFDF5;color:#059669;border:1px solid #6EE7B7}
+.status-partial{background:#FFFBEB;color:#D97706;border:1px solid #FDE68A}
+.status-missing{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+.status-nodata{background:#F9FAFB;color:#9CA3AF;border:1px solid #E5E7EB}
+.intent-comp{font-size:12px;color:#6366F1;font-weight:500}
+
+/* ── Snapshot enhancements ── */
+.snap-type-tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;margin-bottom:4px;border:1px solid}
+.snap-conf{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;font-weight:600;padding:1px 6px;border-radius:3px;text-transform:uppercase;border:1px solid;margin-left:5px}
+.snap-conf.high{background:#ECFDF5;color:#059669;border-color:#6EE7B7}
+.snap-conf.medium{background:#FFFBEB;color:#D97706;border-color:#FDE68A}
+.snap-conf.low{background:#F9FAFB;color:#9CA3AF;border-color:#E5E7EB}
+.snap-callout{font-size:12.5px;color:#6B7280;background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:10px 14px;margin-bottom:14px;line-height:1.6}
+
+/* ── Premium feature placeholders ── */
+.premium-section{padding:30px 56px;border-bottom:1px solid #F3F4F6;background:linear-gradient(135deg,#FAFBFF 0%,#F5F3FF 100%)}
+.premium-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:18px}
+.premium-card{background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:20px 20px 18px;position:relative;overflow:hidden;opacity:.82;transition:opacity .2s}
+.premium-card::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(99,102,241,.025) 8px,rgba(99,102,241,.025) 9px);pointer-events:none}
+.premium-card:hover{opacity:.95}
+.premium-lock{font-size:20px;margin-bottom:10px;display:block;opacity:.5}
+.premium-card-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14.5px;color:#374151;margin-bottom:8px}
+.premium-card-desc{font-size:13px;color:#6B7280;line-height:1.65;margin-bottom:14px}
+.premium-lock-note{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;font-weight:700;text-transform:uppercase;padding:5px 10px;border-radius:6px;display:inline-block}
+.premium-lock-note.free-next{background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE}
+.premium-lock-note.pro{background:#FDF4FF;color:#6B21A8;border:1px solid #E9D5FF}
+
 /* ===== Print ===== */
 @media print{
   .sidebar,.rpt-actions,.st-empty,.st-gen{display:none!important}
@@ -1306,6 +1348,94 @@ function renderReport(r) {
   const missedResults = queryResults.filter(q => !q.error && !q.businessMentioned && (q.quality === 'strong' || q.quality === 'moderate'));
   const uncertainResults = queryResults.filter(q => q.error || q.quality === 'empty' || q.quality === 'thin');
 
+  // ── Intent Coverage Matrix computation ──
+  const intentDefs = [
+    {key:'discovery',    name:'Product Discovery', desc:"Buyers asking 'what’s best for X'"},
+    {key:'location',     name:'Local / Location',  desc:"Buyers asking 'near me' or named place"},
+    {key:'comparison',   name:'Comparison',        desc:'Buyers comparing brands or options'},
+    {key:'specific_product', name:'Product Specific', desc:'Queries about a particular product type'},
+    {key:'availability', name:'Where to Buy',      desc:'Buyers asking where to purchase'},
+    {key:'awareness',    name:'Brand Awareness',   desc:"General 'who sells X' queries"},
+    {key:'occasion',     name:'Occasion / Gift',   desc:'Seasonal or gifting queries'},
+    {key:'gift',         name:'Gift Ideas',        desc:'Gift recommendation queries'},
+    {key:'trade',        name:'Trade / B2B',       desc:'Wholesale or trade buyer queries'},
+  ];
+
+  const intentMap = {};
+  queryResults.forEach(q => {
+    const k = q.promptType || 'discovery';
+    if (!intentMap[k]) intentMap[k] = {appeared:0, missed:0, uncertain:0, total:0, topComp:null, compCount:{}};
+    const im = intentMap[k];
+    im.total++;
+    if (q.error || q.quality === 'empty' || q.quality === 'thin') {
+      im.uncertain++;
+    } else if (q.businessMentioned) {
+      im.appeared++;
+    } else {
+      im.missed++;
+      // track top competitor for this intent
+      (q.recommendations||[]).forEach(rec => {
+        const n=(rec.name||'').trim();
+        if (!n) return;
+        const nl=n.toLowerCase(), bl2=biz.name.toLowerCase();
+        if (!nl.includes(bl2) && !bl2.includes(nl)) {
+          im.compCount[n]=(im.compCount[n]||0)+1;
+        }
+      });
+    }
+  });
+  // Resolve top competitor per intent
+  Object.values(intentMap).forEach(im => {
+    const top = Object.entries(im.compCount).sort((a,b)=>b[1]-a[1])[0];
+    im.topComp = top ? top[0] : null;
+  });
+
+  function intentStatusLabel(im) {
+    const reliable = im.appeared + im.missed;
+    if (reliable === 0) return {cls:'status-nodata', label:'No data'};
+    const pct = Math.round(im.appeared / reliable * 100);
+    if (pct >= 60) return {cls:'status-winning', label:'Winning'};
+    if (pct >= 20) return {cls:'status-partial', label:'Partial'};
+    return {cls:'status-missing', label:'Missing'};
+  }
+
+  const intentRowsHtml = intentDefs
+    .filter(d => intentMap[d.key] && intentMap[d.key].total > 0)
+    .map(d => {
+      const im = intentMap[d.key];
+      const reliable = im.appeared + im.missed;
+      const total = im.total;
+      const st = intentStatusLabel(im);
+      const barAppPct = total > 0 ? Math.round(im.appeared/total*100) : 0;
+      const barMisPct = total > 0 ? Math.round(im.missed/total*100) : 0;
+      const barUncPct = total > 0 ? Math.round(im.uncertain/total*100) : 0;
+      // Ensure bars add up visually
+      const barApp = barAppPct > 0 ? `<div class="intent-bar-appeared${im.missed===0&&im.uncertain===0?' intent-bar-full':''}" style="width:${barAppPct}%"></div>` : '';
+      const barMis = barMisPct > 0 ? `<div class="intent-bar-missed${im.uncertain===0?' intent-bar-full':''}" style="width:${barMisPct}%"></div>` : '';
+      const barUnc = barUncPct > 0 ? `<div class="intent-bar-uncertain intent-bar-full" style="width:${barUncPct}%"></div>` : '';
+      return `<tr>
+        <td><span class="intent-type-name">${x(d.name)}</span><span class="intent-type-desc">${x(d.desc)}</span></td>
+        <td style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:#6B7280">${total}</td>
+        <td><div class="intent-bar">${barApp}${barMis}${barUnc}</div><div class="intent-count">${im.appeared} appeared · ${im.missed} missed · ${im.uncertain} uncertain</div></td>
+        <td><span class="intent-status ${st.cls}">${st.label}</span></td>
+        <td class="intent-comp">${im.topComp ? x(im.topComp) : '<span style="color:#D1D5DB">—</span>'}</td>
+      </tr>`;
+    }).join('');
+
+  const intentMatrixHtml = `<div class="rpt-sec">
+    <div class="sec-title">Visibility by Customer Intent</div>
+    <p style="font-size:13.5px;color:#6B7280;margin-bottom:16px;line-height:1.65">This is the commercial heart of the report — it shows which types of buyer query you are winning and where you are invisible. Each row represents a different moment in the customer journey. Winning a query type means AI is recommending you when buyers are in that mindset; missing it means a competitor is taking that attention.</p>
+    ${intentRowsHtml ? `<table class="intent-matrix">
+      <thead><tr><th>Intent Type</th><th style="text-align:center">Queries</th><th>Coverage</th><th>Status</th><th>Top Competitor</th></tr></thead>
+      <tbody>${intentRowsHtml}</tbody>
+    </table>
+    <div style="margin-top:12px;font-size:12px;color:#9CA3AF;display:flex;gap:16px;flex-wrap:wrap">
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:12px;height:8px;background:#10B981;border-radius:2px"></span>Appeared</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:12px;height:8px;background:#EF4444;border-radius:2px"></span>Missed</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:12px;height:8px;background:#D1D5DB;border-radius:2px"></span>Uncertain (excluded from score)</span>
+    </div>` : '<p style="color:#9CA3AF;font-size:13px">No query type data available.</p>'}
+  </div>`;
+
   // Prompt types distribution for exec summary
   const appearedByType = {};
   appearedResults.forEach(q => { const t = ptypeLabel[q.promptType] || q.promptType; appearedByType[t] = (appearedByType[t] || 0) + 1; });
@@ -1391,7 +1521,11 @@ function renderReport(r) {
   const bl = biz.name.toLowerCase();
   const snapAppearedHtml = appearedResults.map(q => {
     const compsThere = (q.recommendations || []).filter(r => { const rl=(r.name||'').toLowerCase(); return !rl.includes(bl)&&!bl.includes(rl); }).slice(0,3).map(r=>r.name).join(', ');
+    const pt = q.promptType || 'discovery';
+    const confCls = q.quality === 'strong' ? 'high' : 'medium';
+    const confTxt = q.quality === 'strong' ? 'High' : 'Medium';
     return `<div class="snap-item">
+      <div><span class="snap-type-tag ptype ${pt}" style="margin-bottom:4px">${ptypeLabel[pt]||pt}</span><span class="snap-conf ${confCls}">${confTxt}</span></div>
       <div class="snap-item-q">"${x(q.question.length > 70 ? q.question.slice(0,70)+'…' : q.question)}"</div>
       ${compsThere ? `<div class="snap-item-sub">Also: ${x(compsThere)}</div>` : '<div class="snap-item-sub" style="color:#059669">Only brand recommended</div>'}
     </div>`;
@@ -1399,15 +1533,21 @@ function renderReport(r) {
 
   const snapMissedHtml = missedResults.map(q => {
     const winners = (q.recommendations || []).filter(r => { const rl=(r.name||'').toLowerCase(); return !rl.includes(bl)&&!bl.includes(rl); }).slice(0,3).map(r=>r.name).join(', ');
+    const pt = q.promptType || 'discovery';
+    const confCls = q.quality === 'strong' ? 'high' : 'medium';
+    const confTxt = q.quality === 'strong' ? 'High' : 'Medium';
     return `<div class="snap-item">
+      <div><span class="snap-type-tag ptype ${pt}" style="margin-bottom:4px">${ptypeLabel[pt]||pt}</span><span class="snap-conf ${confCls}">${confTxt}</span></div>
       <div class="snap-item-q">"${x(q.question.length > 70 ? q.question.slice(0,70)+'…' : q.question)}"</div>
       ${winners ? `<div class="snap-item-sub comp">→ ${x(winners)}</div>` : '<div class="snap-item-sub">No brand recommended</div>'}
     </div>`;
   }).join('') || '<div class="snap-item"><div class="snap-item-q" style="color:#9CA3AF;font-style:normal">No missed queries</div></div>';
 
   const snapUncertainHtml = uncertainResults.map(q => {
+    const pt = q.promptType || 'discovery';
     const reason = q.error ? 'API error' : q.quality === 'empty' ? 'No AI recommendations returned' : 'Only 1 recommendation returned — low confidence';
     return `<div class="snap-item">
+      <div><span class="snap-type-tag ptype ${pt}" style="margin-bottom:4px">${ptypeLabel[pt]||pt}</span><span class="snap-conf low">Low</span></div>
       <div class="snap-item-q">"${x(q.question ? (q.question.length > 70 ? q.question.slice(0,70)+'…' : q.question) : 'Unknown query')}"</div>
       <div class="snap-item-sub reason">${reason}</div>
     </div>`;
@@ -1506,6 +1646,9 @@ function renderReport(r) {
       </div>
     </div>
 
+    <!-- INTENT COVERAGE MATRIX -->
+    ${intentMatrixHtml}
+
     <!-- COMPANY PROFILE -->
     <div class="rpt-sec">
       <div class="sec-title">Company Profile Detected</div>
@@ -1535,6 +1678,7 @@ function renderReport(r) {
     <!-- VISIBILITY SNAPSHOT -->
     <div class="rpt-sec">
       <div class="sec-title">Visibility Snapshot — ${queryResults.length} Queries Tested</div>
+      <div class="snap-callout">Unbranded discovery queries only — branded queries are shown in AI Brand Footprint above. Each item shows the intent type and result confidence level.</div>
       <div class="snap-grid">
         <div class="snap-col">
           <div class="snap-col-head appeared">
@@ -1614,6 +1758,32 @@ function renderReport(r) {
       <div class="tracking-cta">
         <p>Next report due: ${nextCheckStr}</p>
         <small>AI visibility shifts as website content is updated, models retrain, and competitors optimise. Monthly tracking turns a single data point into a trend — and a trend into commercial intelligence.</small>
+      </div>
+    </div>
+
+    <!-- PREMIUM FEATURE PLACEHOLDERS -->
+    <div class="premium-section">
+      <div class="sec-title">Coming Soon — Premium Features</div>
+      <p style="font-size:13.5px;color:#6B7280;margin-bottom:4px;line-height:1.65">These features are in development for subscribers. Your current report already includes full visibility scoring, intent analysis, competitor intelligence, and priority actions.</p>
+      <div class="premium-cards">
+        <div class="premium-card">
+          <span class="premium-lock">🔒</span>
+          <div class="premium-card-title">Month-on-Month Trends</div>
+          <div class="premium-card-desc">Compare this month's score against last month. See which query types improved, which competitors gained ground, and track your AI visibility trend line over time.</div>
+          <span class="premium-lock-note free-next">Available from your second report</span>
+        </div>
+        <div class="premium-card">
+          <span class="premium-lock">🔒</span>
+          <div class="premium-card-title">Competitor Deep-Dive</div>
+          <div class="premium-card-desc">See the full AI footprint of your top 3 competitors — what they appear for, what content they publish, and exactly how to outrank them query by query.</div>
+          <span class="premium-lock-note pro">Upgrade to Pro · £79/month</span>
+        </div>
+        <div class="premium-card">
+          <span class="premium-lock">🔒</span>
+          <div class="premium-card-title">Multi-Model Testing</div>
+          <div class="premium-card-desc">Test visibility across ChatGPT, Gemini, and Perplexity separately. Different AI models favour different content signals — see where you stand on each.</div>
+          <span class="premium-lock-note pro">Upgrade to Pro · £79/month</span>
+        </div>
       </div>
     </div>
 
