@@ -580,7 +580,7 @@
       var data = await res.json();
       if (!res.ok) {
         var msgs = { email_already_registered: 'An account with this email already exists. Try signing in instead.', password_too_short: 'Password must be at least 6 characters.' };
-        errEl.textContent = msgs[data.error] || 'Something went wrong — please try again.';
+        errEl.textContent = msgs[data.error] || ('Error: ' + (data.detail || data.error || 'unknown'));
         errEl.classList.add('show');
       } else {
         localStorage.setItem('visible_token', data.token);
