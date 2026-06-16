@@ -344,6 +344,22 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
 .exec-cell.action-highlight{border-color:#A7F3D0;background:#ECFDF5}
 .exec-cell.action-highlight .exec-cell-val{color:#065F46;font-weight:500}
 
+/* ── Four visibility dimensions ── */
+.dim-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0 24px}
+@media(max-width:700px){.dim-grid{grid-template-columns:1fr 1fr}}
+.dim-card{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:16px 18px}
+.dim-card-discovery{border-color:#C7D2FE;background:#F5F3FF}
+.dim-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#9CA3AF;margin-bottom:6px}
+.dim-value{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;line-height:1;margin-bottom:5px}
+.dim-detail{font-size:11.5px;color:#6B7280;line-height:1.45}
+
+/* ── Commercial relevance badges on snapshot items ── */
+.snap-rel{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:4px}
+.snap-rel.high{background:#FEF3C7;color:#92400E}
+.snap-rel.low{background:#F3F4F6;color:#9CA3AF}
+.snap-item-broad{opacity:.75}
+.snap-item-broad-note{font-size:11.5px;color:#9CA3AF;font-style:italic;margin-top:5px;line-height:1.4}
+
 /* ── Brand Audit rows ── */
 .audit-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #F3F4F6}
 .audit-row:last-child{border-bottom:none}
@@ -1046,13 +1062,53 @@ function renderReport(r) {
   const poorResults = queryResults.filter(q => !q.error && (q.quality === 'thin' || q.quality === 'empty'));
   const scoreNote = poorResults.length > 0 ? ' (' + poorResults.length + ' low-quality result' + (poorResults.length > 1 ? 's' : '') + ' excluded from score)' : '';
 
-  const coverInterp = score >= 75
-    ? biz.name + ' has strong AI visibility — appearing in most well-formed queries tested. The priority is maintaining this position and closing remaining gaps before competitors optimise.'
-    : score >= 50
-    ? biz.name + ' has moderate AI visibility — appearing in some queries but absent from others where competitors are winning. Targeted content improvements can close these gaps.'
-    : score >= 25
-    ? biz.name + ' has limited AI visibility — rarely recommended by AI assistants in your category. Content that directly addresses buyer questions is the primary lever for improvement.'
-    : 'AI visibility for ' + biz.name + ' is not yet established — the brand did not appear in AI recommendations for the queries tested. This report identifies exactly what needs to change.';
+  // ── Four visibility dimensions ──
+  // 1. Brand Footprint — does AI know who this brand is?
+  const dimBrandScore = auditResults.length > 0 ? Math.round(auditRecognised.length / auditResults.length * 100) : null;
+  const dimBrandLabel = dimBrandScore === null ? 'No data' : dimBrandScore >= 80 ? 'Strong' : dimBrandScore >= 50 ? 'Partial' : 'Weak';
+  const dimBrandColour = dimBrandScore === null ? '#9CA3AF' : dimBrandScore >= 80 ? '#059669' : dimBrandScore >= 50 ? '#D97706' : '#DC2626';
+
+  // 2. Product/Service Knowledge — does AI know what they sell?
+  const dimProductScore = auditKnownProducts.length >= 4 ? 'Strong' : auditKnownProducts.length >= 2 ? 'Partial' : auditKnownProducts.length === 1 ? 'Weak' : 'Unknown';
+  const dimProductColour = dimProductScore === 'Strong' ? '#059669' : dimProductScore === 'Partial' ? '#D97706' : dimProductScore === 'Weak' ? '#DC2626' : '#9CA3AF';
+
+  // 3. Availability/Stockist — does AI know where to buy?
+  const dimAvailScore = auditKnownChannels.length >= 3 ? 'Strong' : auditKnownChannels.length >= 1 ? 'Partial' : 'Unknown';
+  const dimAvailColour = dimAvailScore === 'Strong' ? '#059669' : dimAvailScore === 'Partial' ? '#D97706' : '#9CA3AF';
+
+  // 4. Unbranded Discovery — does AI recommend it in buyer searches?
+  const dimDiscoveryLabel = score >= 60 ? 'Strong' : score >= 30 ? 'Partial' : score >= 10 ? 'Weak' : 'Not yet';
+  const dimDiscoveryColour = score >= 60 ? '#059669' : score >= 30 ? '#D97706' : '#DC2626';
+
+  // ── Commercial relevance per query ──
+  // Classifies each query as high/medium/low relevance to avoid treating broad prompts as failures
+  function queryRelevance(q) {
+    const pt = q.promptType || 'discovery';
+    if (['specific_product', 'comparison', 'awareness'].includes(pt)) return 'high';
+    if (pt === 'location') return 'high';
+    if (pt === 'discovery') return 'medium';
+    if (['occasion', 'gift'].includes(pt)) return 'medium';
+    if (pt === 'trade') return 'low';
+    return 'medium';
+  }
+  // High-relevance missed queries = genuine commercial gaps
+  const highRelevanceMissed = missedResults.filter(q => queryRelevance(q) === 'high');
+  const broadMissed = missedResults.filter(q => queryRelevance(q) !== 'high');
+
+  // ── Cover interpretation — brand-aware, nuanced ──
+  const coverInterp = (() => {
+    const productNote = auditKnownProducts.length > 0 ? ` Its products (${auditKnownProducts.slice(0,2).join(', ')}${auditKnownProducts.length > 2 ? ' and others' : ''}) are known to AI.` : '';
+    const channelNote = auditKnownChannels.length > 0 ? ` Stockists known: ${auditKnownChannels.slice(0,2).join(', ')}.` : '';
+    if (score >= 75) return biz.name + ' has strong AI visibility — appearing in most well-formed queries tested. The priority is maintaining this position and closing remaining gaps before competitors optimise.';
+    if (score >= 50) return biz.name + ' has moderate AI visibility — appearing in some queries but absent from others where competitors are winning. Targeted content improvements can close these gaps.';
+    if (brandRecognised && score < 25) {
+      // Key fix: brand known but not appearing in discovery searches
+      const gapCount = highRelevanceMissed.length;
+      return `AI recognises ${biz.name} and understands the brand.${productNote}${channelNote} However, it is not yet recommending the brand in unbranded buyer searches${gapCount > 0 ? ' — ' + gapCount + ' commercially relevant quer' + (gapCount === 1 ? 'y' : 'ies') + ' returned competitors instead' : ''}. The opportunity is to close the gap between brand awareness and buyer discovery.`;
+    }
+    if (score >= 25) return biz.name + ' has limited AI visibility — appearing in some queries but absent from most. Content that directly addresses buyer questions is the primary lever for improvement.';
+    return `${biz.name} did not appear in AI buyer discovery searches for the queries tested.${brandRecognised ? ` Note: AI does recognise the brand — the issue is unbranded discovery, not brand anonymity.` : ''} This report identifies exactly what needs to change.`;
+  })();
 
   // Delta
   const delta = r.delta;
@@ -1536,10 +1592,13 @@ function renderReport(r) {
     const pt = q.promptType || 'discovery';
     const confCls = q.quality === 'strong' ? 'high' : 'medium';
     const confTxt = q.quality === 'strong' ? 'High' : 'Medium';
-    return `<div class="snap-item">
-      <div><span class="snap-type-tag ptype ${pt}" style="margin-bottom:4px">${ptypeLabel[pt]||pt}</span><span class="snap-conf ${confCls}">${confTxt}</span></div>
+    const rel = queryRelevance(q);
+    const relBadge = rel === 'high' ? '<span class="snap-rel high">Commercial gap</span>' : rel === 'low' ? '<span class="snap-rel low">Broad prompt</span>' : '';
+    return `<div class="snap-item${rel !== 'high' ? ' snap-item-broad' : ''}">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px"><span class="snap-type-tag ptype ${pt}">${ptypeLabel[pt]||pt}</span><span class="snap-conf ${confCls}">${confTxt}</span>${relBadge}</div>
       <div class="snap-item-q">"${x(q.question.length > 70 ? q.question.slice(0,70)+'…' : q.question)}"</div>
       ${winners ? `<div class="snap-item-sub comp">→ ${x(winners)}</div>` : '<div class="snap-item-sub">No brand recommended</div>'}
+      ${rel !== 'high' ? `<div class="snap-item-broad-note">Broad prompt — absence here carries lower commercial weight than high-intent gaps.</div>` : ''}
     </div>`;
   }).join('') || '<div class="snap-item"><div class="snap-item-q" style="color:#9CA3AF;font-style:normal">No missed queries</div></div>';
 
@@ -1623,12 +1682,37 @@ function renderReport(r) {
     <!-- EXECUTIVE SUMMARY -->
     <div class="exec-summary">
       <div class="exec-tier">
-        <div class="exec-tier-name">${tierLabel} Visibility</div>
+        <div class="exec-tier-name">${brandRecognised && score < 30 ? 'Known Brand · Low Discovery' : tierLabel + ' Visibility'}</div>
         <span class="tier-badge ${tierCls}">${tierLabel}</span>
       </div>
+
+      <!-- Four visibility dimensions -->
+      <div class="dim-grid">
+        <div class="dim-card">
+          <div class="dim-label">Brand Recognition</div>
+          <div class="dim-value" style="color:${dimBrandColour}">${dimBrandLabel}</div>
+          <div class="dim-detail">${auditResults.length > 0 ? auditRecognised.length + '/' + auditResults.length + ' audit questions answered' : 'No audit data'}</div>
+        </div>
+        <div class="dim-card">
+          <div class="dim-label">Product Knowledge</div>
+          <div class="dim-value" style="color:${dimProductColour}">${dimProductScore}</div>
+          <div class="dim-detail">${auditKnownProducts.length > 0 ? auditKnownProducts.slice(0,2).map(p=>x(p)).join(', ') + (auditKnownProducts.length > 2 ? ' +' + (auditKnownProducts.length-2) : '') : 'No products detected'}</div>
+        </div>
+        <div class="dim-card">
+          <div class="dim-label">Stockist Awareness</div>
+          <div class="dim-value" style="color:${dimAvailColour}">${dimAvailScore}</div>
+          <div class="dim-detail">${auditKnownChannels.length > 0 ? auditKnownChannels.slice(0,3).map(c=>x(c)).join(', ') : 'No channel data'}</div>
+        </div>
+        <div class="dim-card dim-card-discovery">
+          <div class="dim-label">Unbranded Discovery</div>
+          <div class="dim-value" style="color:${dimDiscoveryColour}">${dimDiscoveryLabel}</div>
+          <div class="dim-detail">${mentionCount}/${strongResults.length} discovery queries · ${score}/100 score</div>
+        </div>
+      </div>
+
       <div class="exec-qa">
         <div class="exec-qa-row">
-          <div class="exec-qa-q">Is ${x(biz.name)} appearing in AI recommendations?</div>
+          <div class="exec-qa-q">Does AI know ${x(biz.name)}?</div>
           <div class="exec-qa-a">${x(visibilityAnswer)}${visibilityAnswerSub ? `<div class="sub">${x(visibilityAnswerSub)}</div>` : ''}</div>
         </div>
         <div class="exec-qa-row">
@@ -1636,8 +1720,8 @@ function renderReport(r) {
           <div class="exec-qa-a">${x(competitorAnswer)}${competitorSub ? `<div class="sub">${x(competitorSub)}</div>` : ''}</div>
         </div>
         <div class="exec-qa-row">
-          <div class="exec-qa-q">What's holding the brand back?</div>
-          <div class="exec-qa-a">${x(holdingBackAnswer)}${holdingBackSub ? `<div class="sub">${x(holdingBackSub)}</div>` : ''}</div>
+          <div class="exec-qa-q">Which gaps are genuine commercial risks?</div>
+          <div class="exec-qa-a">${highRelevanceMissed.length > 0 ? highRelevanceMissed.length + ' high-relevance quer' + (highRelevanceMissed.length === 1 ? 'y' : 'ies') + ' returned competitors — these represent direct commercial exposure.' + (broadMissed.length > 0 ? ' A further ' + broadMissed.length + ' broad or low-relevance quer' + (broadMissed.length === 1 ? 'y' : 'ies') + ' also missed, but these carry lower commercial weight.' : '') : broadMissed.length > 0 ? 'Missed queries are mostly broad or low-relevance — these are lower commercial risk than high-intent gaps.' : 'No significant commercial gaps detected in this run.'}<div class="sub">${x(holdingBackAnswer)}</div></div>
         </div>
         <div class="exec-qa-row">
           <div class="exec-qa-q">What should we do this month?</div>
