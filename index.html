@@ -1480,15 +1480,6 @@
     document.getElementById('close-ok').classList.add('show');
   });
 
-  // ── Hero Formspree ────────────────────────────────────────────────────────
-  document.getElementById('hero-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var f = this;
-    fetch(f.action, { method: 'POST', body: new FormData(f), headers: { Accept: 'application/json' } }).catch(function () {});
-    f.classList.add('done');
-    document.getElementById('hero-ok').classList.add('show');
-  });
-
   // ── Step control ──────────────────────────────────────────────────────────
   var STEPS = ['step-input', 'step-loading', 'step-fallback', 'step-email'];
   function showStep(id) {
