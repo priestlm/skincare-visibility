@@ -797,6 +797,15 @@
   .footer-legal { font-size: 12px; color: var(--ink-muted); line-height: 1.6 }
   .footer-independence { font-size: 12px; color: var(--ink-muted); font-style: italic }
 
+  /* ── Sign-up tabs ── */
+  .signup-tab {
+    flex: 1; padding: 8px; border-radius: 7px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13.5px;
+    border: none; background: transparent; color: var(--ink-muted);
+    transition: background .15s, color .15s;
+  }
+  .signup-tab.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.3) }
+
   /* ── Responsive ── */
   @media (max-width: 960px) {
     .hero { grid-template-columns: 1fr; gap: 44px; padding: 44px 0 64px }
@@ -840,7 +849,7 @@
     </ul>
 
     <div class="nav-cta">
-      <a href="/admin.html" class="nav-signin">My reports</a>
+      <a href="/portal.html" class="nav-signin" id="nav-portal-link">My Portal</a>
       <a href="#step-input" class="nav-btn" onclick="window.scrollTo({top:0,behavior:'smooth'});return false">Free analysis →</a>
     </div>
   </div>
@@ -929,28 +938,62 @@
         </div>
       </div>
 
-      <!-- Step 4: Email capture -->
+      <!-- Step 4: Sign up & send preview -->
       <div id="step-email" class="step">
-        <p style="font-family:'Space Grotesk',sans-serif;font-size:1.05rem;margin-bottom:14px;line-height:1.45;color:var(--ink-soft)">Your initial preview is ready. Enter your email to receive a summary and find out how to get your <em style="font-style:normal;color:var(--accent-bright)">full Starter Report.</em></p>
-        <form class="email-form" id="hero-form" action="https://formspree.io/f/mojzkvgo" method="POST" data-form>
-          <input type="hidden" name="website_url"            id="h-url">
-          <input type="hidden" name="organisation_name"     id="h-org">
-          <input type="hidden" name="brand_name"            id="h-brand">
-          <input type="hidden" name="market"                id="h-market">
-          <input type="hidden" name="analysis_status"       id="h-status">
-          <input type="hidden" name="inferred_category"     id="h-category">
-          <input type="hidden" name="detected_niche"        id="h-niche">
-          <input type="hidden" name="products_found"        id="h-products">
-          <input type="hidden" name="secondary_categories"  id="h-categories">
-          <input type="hidden" name="summary"               id="h-summary">
-          <input type="hidden" name="generated_questions"   id="h-questions">
-          <input type="hidden" name="visibility_gaps"       id="h-gaps">
-          <input type="hidden" name="timestamp"             id="h-timestamp">
-          <input type="email" name="email" placeholder="you@yourbrand.com" required aria-label="Your email address">
-          <button type="submit">Send preview</button>
-        </form>
-        <p class="ok" id="hero-ok" role="status">Thanks — check your inbox. We'll follow up about your Starter Report.</p>
-        <p class="microcopy" style="margin-top:10px"><b>Free initial preview.</b> No card required. We won't add you to a mailing list without consent.</p>
+        <!-- Hidden data fields (populated by renderResult) -->
+        <input type="hidden" id="h-url">
+        <input type="hidden" id="h-org">
+        <input type="hidden" id="h-brand">
+        <input type="hidden" id="h-market">
+        <input type="hidden" id="h-status">
+        <input type="hidden" id="h-category">
+        <input type="hidden" id="h-niche">
+        <input type="hidden" id="h-products">
+        <input type="hidden" id="h-categories">
+        <input type="hidden" id="h-summary">
+        <input type="hidden" id="h-questions">
+        <input type="hidden" id="h-gaps">
+        <input type="hidden" id="h-timestamp">
+
+        <!-- Sign-up / sign-in tabs -->
+        <div id="signup-panel">
+          <p style="font-family:'Space Grotesk',sans-serif;font-size:1.05rem;margin-bottom:14px;line-height:1.45;color:var(--ink-soft)">Your preview is ready. Create a free account to save it and get your <em style="font-style:normal;color:var(--accent-bright)">full Starter Report.</em></p>
+          <div style="display:flex;gap:0;background:var(--surface-2);border-radius:10px;padding:4px;margin-bottom:16px">
+            <button type="button" class="signup-tab active" id="su-tab-btn" onclick="suShowTab('signup')">Create account</button>
+            <button type="button" class="signup-tab" id="si-tab-btn" onclick="suShowTab('signin')">Sign in</button>
+          </div>
+
+          <!-- Create account -->
+          <div id="su-panel-signup">
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <input type="text"     id="su-name"     placeholder="Your name (optional)" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14.5px;width:100%;transition:border-color .2s" onfocus="this.style.borderColor='rgba(99,102,241,.5)'" onblur="this.style.borderColor=''">
+              <input type="email"    id="su-email"    placeholder="you@yourbrand.com" autocomplete="email" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14.5px;width:100%;transition:border-color .2s" onfocus="this.style.borderColor='rgba(99,102,241,.5)'" onblur="this.style.borderColor=''">
+              <input type="password" id="su-password" placeholder="Choose a password (min. 6 chars)" autocomplete="new-password" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14.5px;width:100%;transition:border-color .2s" onfocus="this.style.borderColor='rgba(99,102,241,.5)'" onblur="this.style.borderColor=''">
+            </div>
+            <button type="button" id="btn-signup-submit" style="margin-top:12px;width:100%;padding:12px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--accent) 0%,var(--accent-warm) 100%);color:#fff;font-family:'DM Sans',sans-serif;font-weight:600;font-size:15px;box-shadow:0 4px 20px rgba(99,102,241,.35);transition:opacity .15s">Sign up &amp; save preview →</button>
+            <p id="su-error" style="font-size:13px;color:var(--danger);margin-top:8px;display:none"></p>
+          </div>
+
+          <!-- Sign in -->
+          <div id="su-panel-signin" style="display:none">
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <input type="email"    id="si-email2"    placeholder="you@yourbrand.com" autocomplete="email" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14.5px;width:100%;transition:border-color .2s" onfocus="this.style.borderColor='rgba(99,102,241,.5)'" onblur="this.style.borderColor=''">
+              <input type="password" id="si-password2" placeholder="Your password" autocomplete="current-password" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--ink);font-family:'DM Sans',sans-serif;font-size:14.5px;width:100%;transition:border-color .2s" onfocus="this.style.borderColor='rgba(99,102,241,.5)'" onblur="this.style.borderColor=''">
+            </div>
+            <button type="button" id="btn-signin-submit" style="margin-top:12px;width:100%;padding:12px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--accent) 0%,var(--accent-warm) 100%);color:#fff;font-family:'DM Sans',sans-serif;font-weight:600;font-size:15px;box-shadow:0 4px 20px rgba(99,102,241,.35);transition:opacity .15s">Sign in &amp; save preview →</button>
+            <p id="si-error2" style="font-size:13px;color:var(--danger);margin-top:8px;display:none"></p>
+          </div>
+
+          <p class="microcopy" style="margin-top:10px"><b>Free account.</b> No card required. Cancel any time.</p>
+        </div>
+
+        <!-- Success state -->
+        <div id="signup-success" style="display:none">
+          <div style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);border-radius:14px;padding:20px 22px">
+            <p style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.05rem;color:var(--success);margin-bottom:6px">Account created ✓</p>
+            <p style="font-size:14px;color:var(--ink-soft);line-height:1.6">Your preview has been saved to your account. Taking you to your portal…</p>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -1739,6 +1782,127 @@
     document.getElementById('progress-fill').style.width = '0%';
     showStep('step-input');
     document.getElementById('input-url').focus();
+  });
+
+  // ── Auth: nav state ───────────────────────────────────────────────────────
+  (function updateNavAuth() {
+    var token = localStorage.getItem('visible_token');
+    var link = document.getElementById('nav-portal-link');
+    if (token && link) {
+      link.textContent = 'My Portal';
+    }
+  })();
+
+  // ── Auth: sign-up tab switcher ────────────────────────────────────────────
+  window.suShowTab = function(tab) {
+    document.getElementById('su-panel-signup').style.display = tab === 'signup' ? 'block' : 'none';
+    document.getElementById('su-panel-signin').style.display = tab === 'signin' ? 'block' : 'none';
+    document.getElementById('su-tab-btn').classList.toggle('active', tab === 'signup');
+    document.getElementById('si-tab-btn').classList.toggle('active', tab === 'signin');
+  };
+
+  // ── Auth: collect preview data from hidden fields ─────────────────────────
+  function collectPreviewData() {
+    return {
+      url:      document.getElementById('h-url').value,
+      org:      document.getElementById('h-org').value,
+      orgName:  document.getElementById('h-org').value,
+      category: document.getElementById('h-category').value,
+      niche:    document.getElementById('h-niche').value,
+      summary:  document.getElementById('h-summary').value,
+      questions: document.getElementById('h-questions').value,
+      gaps:     document.getElementById('h-gaps').value,
+      market:   document.getElementById('h-market').value,
+    };
+  }
+
+  // ── Auth: after successful login/register ─────────────────────────────────
+  function onAuthSuccess(token, user) {
+    localStorage.setItem('visible_token', token);
+    document.getElementById('signup-panel').style.display = 'none';
+    document.getElementById('signup-success').style.display = 'block';
+    setTimeout(function() { window.location.href = '/portal.html'; }, 1400);
+  }
+
+  // ── Auth: sign up ──────────────────────────────────────────────────────────
+  document.getElementById('btn-signup-submit').addEventListener('click', async function() {
+    var btn = this;
+    var name     = document.getElementById('su-name').value.trim();
+    var email    = document.getElementById('su-email').value.trim();
+    var password = document.getElementById('su-password').value;
+    var errEl    = document.getElementById('su-error');
+    errEl.style.display = 'none';
+    if (!email) { errEl.textContent = 'Please enter your email address.'; errEl.style.display = 'block'; return; }
+    if (!password || password.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = 'block'; return; }
+    btn.disabled = true; btn.textContent = 'Creating account…';
+    var previewData = collectPreviewData();
+    var orgUrl  = previewData.url || '';
+    var orgName = previewData.orgName || orgUrl;
+    try {
+      var res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'register', email, password, name, orgUrl, orgName, previewData }),
+      });
+      var data = await res.json();
+      if (!res.ok) {
+        var msgs = {
+          email_already_registered: 'An account with this email already exists — try signing in instead.',
+          password_too_short: 'Password must be at least 6 characters.',
+        };
+        errEl.textContent = msgs[data.error] || 'Something went wrong — please try again.';
+        errEl.style.display = 'block';
+      } else {
+        // Also notify operator via Formspree
+        var fd = new FormData();
+        fd.append('email', email); fd.append('website_url', orgUrl);
+        fd.append('organisation_name', orgName); fd.append('source', 'signup');
+        fetch('https://formspree.io/f/mojzkvgo', { method: 'POST', body: fd, headers: { Accept: 'application/json' } }).catch(function(){});
+        onAuthSuccess(data.token, data.user);
+      }
+    } catch(e) {
+      errEl.textContent = 'Could not connect — please try again.';
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false; btn.textContent = 'Sign up & save preview →';
+  });
+
+  // ── Auth: sign in ──────────────────────────────────────────────────────────
+  document.getElementById('btn-signin-submit').addEventListener('click', async function() {
+    var btn = this;
+    var email    = document.getElementById('si-email2').value.trim();
+    var password = document.getElementById('si-password2').value;
+    var errEl    = document.getElementById('si-error2');
+    errEl.style.display = 'none';
+    if (!email || !password) { errEl.textContent = 'Please enter your email and password.'; errEl.style.display = 'block'; return; }
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    try {
+      var res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', email, password }),
+      });
+      var data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error === 'invalid_credentials' ? 'Incorrect email or password.' : 'Something went wrong — please try again.';
+        errEl.style.display = 'block';
+      } else {
+        // Save preview against their account
+        var previewData = collectPreviewData();
+        if (previewData.url) {
+          fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + data.token },
+            body: JSON.stringify({ action: 'save_preview', previewData }),
+          }).catch(function(){});
+        }
+        onAuthSuccess(data.token, data.user);
+      }
+    } catch(e) {
+      errEl.textContent = 'Could not connect — please try again.';
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false; btn.textContent = 'Sign in & save preview →';
   });
 
 })();
