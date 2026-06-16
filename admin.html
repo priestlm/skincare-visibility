@@ -1062,54 +1062,6 @@ function renderReport(r) {
   const poorResults = queryResults.filter(q => !q.error && (q.quality === 'thin' || q.quality === 'empty'));
   const scoreNote = poorResults.length > 0 ? ' (' + poorResults.length + ' low-quality result' + (poorResults.length > 1 ? 's' : '') + ' excluded from score)' : '';
 
-  // ── Four visibility dimensions ──
-  // 1. Brand Footprint — does AI know who this brand is?
-  const dimBrandScore = auditResults.length > 0 ? Math.round(auditRecognised.length / auditResults.length * 100) : null;
-  const dimBrandLabel = dimBrandScore === null ? 'No data' : dimBrandScore >= 80 ? 'Strong' : dimBrandScore >= 50 ? 'Partial' : 'Weak';
-  const dimBrandColour = dimBrandScore === null ? '#9CA3AF' : dimBrandScore >= 80 ? '#059669' : dimBrandScore >= 50 ? '#D97706' : '#DC2626';
-
-  // 2. Product/Service Knowledge — does AI know what they sell?
-  const dimProductScore = auditKnownProducts.length >= 4 ? 'Strong' : auditKnownProducts.length >= 2 ? 'Partial' : auditKnownProducts.length === 1 ? 'Weak' : 'Unknown';
-  const dimProductColour = dimProductScore === 'Strong' ? '#059669' : dimProductScore === 'Partial' ? '#D97706' : dimProductScore === 'Weak' ? '#DC2626' : '#9CA3AF';
-
-  // 3. Availability/Stockist — does AI know where to buy?
-  const dimAvailScore = auditKnownChannels.length >= 3 ? 'Strong' : auditKnownChannels.length >= 1 ? 'Partial' : 'Unknown';
-  const dimAvailColour = dimAvailScore === 'Strong' ? '#059669' : dimAvailScore === 'Partial' ? '#D97706' : '#9CA3AF';
-
-  // 4. Unbranded Discovery — does AI recommend it in buyer searches?
-  const dimDiscoveryLabel = score >= 60 ? 'Strong' : score >= 30 ? 'Partial' : score >= 10 ? 'Weak' : 'Not yet';
-  const dimDiscoveryColour = score >= 60 ? '#059669' : score >= 30 ? '#D97706' : '#DC2626';
-
-  // ── Commercial relevance per query ──
-  // Classifies each query as high/medium/low relevance to avoid treating broad prompts as failures
-  function queryRelevance(q) {
-    const pt = q.promptType || 'discovery';
-    if (['specific_product', 'comparison', 'awareness'].includes(pt)) return 'high';
-    if (pt === 'location') return 'high';
-    if (pt === 'discovery') return 'medium';
-    if (['occasion', 'gift'].includes(pt)) return 'medium';
-    if (pt === 'trade') return 'low';
-    return 'medium';
-  }
-  // High-relevance missed queries = genuine commercial gaps
-  const highRelevanceMissed = missedResults.filter(q => queryRelevance(q) === 'high');
-  const broadMissed = missedResults.filter(q => queryRelevance(q) !== 'high');
-
-  // ── Cover interpretation — brand-aware, nuanced ──
-  const coverInterp = (() => {
-    const productNote = auditKnownProducts.length > 0 ? ` Its products (${auditKnownProducts.slice(0,2).join(', ')}${auditKnownProducts.length > 2 ? ' and others' : ''}) are known to AI.` : '';
-    const channelNote = auditKnownChannels.length > 0 ? ` Stockists known: ${auditKnownChannels.slice(0,2).join(', ')}.` : '';
-    if (score >= 75) return biz.name + ' has strong AI visibility — appearing in most well-formed queries tested. The priority is maintaining this position and closing remaining gaps before competitors optimise.';
-    if (score >= 50) return biz.name + ' has moderate AI visibility — appearing in some queries but absent from others where competitors are winning. Targeted content improvements can close these gaps.';
-    if (brandRecognised && score < 25) {
-      // Key fix: brand known but not appearing in discovery searches
-      const gapCount = highRelevanceMissed.length;
-      return `AI recognises ${biz.name} and understands the brand.${productNote}${channelNote} However, it is not yet recommending the brand in unbranded buyer searches${gapCount > 0 ? ' — ' + gapCount + ' commercially relevant quer' + (gapCount === 1 ? 'y' : 'ies') + ' returned competitors instead' : ''}. The opportunity is to close the gap between brand awareness and buyer discovery.`;
-    }
-    if (score >= 25) return biz.name + ' has limited AI visibility — appearing in some queries but absent from most. Content that directly addresses buyer questions is the primary lever for improvement.';
-    return `${biz.name} did not appear in AI buyer discovery searches for the queries tested.${brandRecognised ? ` Note: AI does recognise the brand — the issue is unbranded discovery, not brand anonymity.` : ''} This report identifies exactly what needs to change.`;
-  })();
-
   // Delta
   const delta = r.delta;
   const deltaHtml = delta ? (() => {
@@ -1506,6 +1458,47 @@ function renderReport(r) {
   const auditKnownProducts = [...new Set(auditResults.flatMap(a => a.products_mentioned || []))].slice(0, 6);
   const auditKnownChannels = [...new Set(auditResults.flatMap(a => a.channels_mentioned || []))].slice(0, 5);
   const brandRecognised = auditRecognised.length > auditResults.length / 2;
+
+  // ── Four visibility dimensions ──
+  const dimBrandScore = auditResults.length > 0 ? Math.round(auditRecognised.length / auditResults.length * 100) : null;
+  const dimBrandLabel = dimBrandScore === null ? 'No data' : dimBrandScore >= 80 ? 'Strong' : dimBrandScore >= 50 ? 'Partial' : 'Weak';
+  const dimBrandColour = dimBrandScore === null ? '#9CA3AF' : dimBrandScore >= 80 ? '#059669' : dimBrandScore >= 50 ? '#D97706' : '#DC2626';
+
+  const dimProductScore = auditKnownProducts.length >= 4 ? 'Strong' : auditKnownProducts.length >= 2 ? 'Partial' : auditKnownProducts.length === 1 ? 'Weak' : 'Unknown';
+  const dimProductColour = dimProductScore === 'Strong' ? '#059669' : dimProductScore === 'Partial' ? '#D97706' : dimProductScore === 'Weak' ? '#DC2626' : '#9CA3AF';
+
+  const dimAvailScore = auditKnownChannels.length >= 3 ? 'Strong' : auditKnownChannels.length >= 1 ? 'Partial' : 'Unknown';
+  const dimAvailColour = dimAvailScore === 'Strong' ? '#059669' : dimAvailScore === 'Partial' ? '#D97706' : '#9CA3AF';
+
+  const dimDiscoveryLabel = score >= 60 ? 'Strong' : score >= 30 ? 'Partial' : score >= 10 ? 'Weak' : 'Not yet';
+  const dimDiscoveryColour = score >= 60 ? '#059669' : score >= 30 ? '#D97706' : '#DC2626';
+
+  // ── Commercial relevance per query ──
+  function queryRelevance(q) {
+    const pt = q.promptType || 'discovery';
+    if (['specific_product', 'comparison', 'awareness'].includes(pt)) return 'high';
+    if (pt === 'location') return 'high';
+    if (pt === 'discovery') return 'medium';
+    if (['occasion', 'gift'].includes(pt)) return 'medium';
+    if (pt === 'trade') return 'low';
+    return 'medium';
+  }
+  const highRelevanceMissed = missedResults.filter(q => queryRelevance(q) === 'high');
+  const broadMissed = missedResults.filter(q => queryRelevance(q) !== 'high');
+
+  // ── Cover interpretation — brand-aware, nuanced ──
+  const coverInterp = (() => {
+    const productNote = auditKnownProducts.length > 0 ? ` Its products (${auditKnownProducts.slice(0,2).join(', ')}${auditKnownProducts.length > 2 ? ' and others' : ''}) are known to AI.` : '';
+    const channelNote = auditKnownChannels.length > 0 ? ` Stockists known: ${auditKnownChannels.slice(0,2).join(', ')}.` : '';
+    if (score >= 75) return biz.name + ' has strong AI visibility — appearing in most well-formed queries tested. The priority is maintaining this position and closing remaining gaps before competitors optimise.';
+    if (score >= 50) return biz.name + ' has moderate AI visibility — appearing in some queries but absent from others where competitors are winning. Targeted content improvements can close these gaps.';
+    if (brandRecognised && score < 25) {
+      const gapCount = highRelevanceMissed.length;
+      return `AI recognises ${biz.name} and understands the brand.${productNote}${channelNote} However, it is not yet recommending the brand in unbranded buyer searches${gapCount > 0 ? ' — ' + gapCount + ' commercially relevant quer' + (gapCount === 1 ? 'y' : 'ies') + ' returned competitors instead' : ''}. The opportunity is to close the gap between brand awareness and buyer discovery.`;
+    }
+    if (score >= 25) return biz.name + ' has limited AI visibility — appearing in some queries but absent from most. Content that directly addresses buyer questions is the primary lever for improvement.';
+    return `${biz.name} did not appear in AI buyer discovery searches for the queries tested.${brandRecognised ? ` Note: AI does recognise the brand — the issue is unbranded discovery, not brand anonymity.` : ''} This report identifies exactly what needs to change.`;
+  })();
 
   // Brand footprint section HTML
   const auditRowHtml = auditResults.map(a => {

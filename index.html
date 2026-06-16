@@ -150,7 +150,7 @@
     display: grid;
     grid-template-columns: 1fr 1.08fr;
     gap: 64px;
-    align-items: center;
+    align-items: start;
     padding: 64px 0 96px;
   }
 
@@ -344,6 +344,7 @@
   }
 
   .ac-body { padding: 20px 20px 22px }
+  #panel-result .ac-body { max-height: 520px; overflow-y: auto }
 
   .query {
     font-family: 'JetBrains Mono', monospace;
@@ -1229,9 +1230,10 @@
     var qEl = document.getElementById('result-questions');
     qEl.innerHTML = '';
 
-    var richQs = Array.isArray(data.questionsRich) && data.questionsRich.length > 0
+    var richQs = (Array.isArray(data.questionsRich) && data.questionsRich.length > 0
       ? data.questionsRich
-      : (data.questions || []).map(function(q){ return { question: q, search_intent: '' }; });
+      : (data.questions || []).map(function(q){ return { question: q, search_intent: '' }; })
+    ).slice(0, 5);
     var _askBusinessName = orgName || brandName || '';
     richQs.forEach(function (qObj) {
       var qText   = typeof qObj === 'string' ? qObj : (qObj.question || '');
