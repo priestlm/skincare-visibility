@@ -1411,6 +1411,7 @@ module.exports = async (req, res) => {
   // AI generates brand-specific questions using DDG data as context
   const aiRaw = await callAI({ title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' }, targetUrl, 'ok', ddgSignal, userLocation);
   const ai = aiRaw && !aiRaw._error ? aiRaw : null;
+  console.log('AI result:', JSON.stringify({ error: aiRaw?._error, detail: aiRaw?._errorDetail }).slice(0, 200));
 
   let responseData;
 
@@ -1471,7 +1472,7 @@ module.exports = async (req, res) => {
 
     responseData = {
       fetchedOk: false, needsManualCategory: false, analysis_status: 'ok',
-      aiAssisted: false, manual: false,
+      aiAssisted: false, manual: false, _aiError: aiRaw?._error, _aiDetail: aiRaw?._errorDetail,
       title: displayTitle, organisationName: displayTitle, summary,
       primary, niche: null,
       productsFound: false, productsStructured: [], customerChannels: [], publicSignals: [], visibilityGaps: [],
