@@ -3,27 +3,20 @@ const crypto = require('crypto');
 const REDIS_URL   = process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-async function redisGet(key) {
-  const res = await fetch(`${REDIS_URL}/get/${encodeURIComponent(key)}`, {
-    headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+async function redis(command, ...args) {
+  const res = await fetch(REDIS_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${REDIS_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify([command, ...args]),
   });
-  return (await res.json()).result;
+  const data = await res.json();
+  if (data.error) throw new Error(`Redis error: ${data.error}`);
+  return data.result;
 }
 
-async function redisSet(key, value, exSeconds) {
-  const parts = [encodeURIComponent(key), encodeURIComponent(value)];
-  if (exSeconds) parts.push('EX', exSeconds);
-  const res = await fetch(`${REDIS_URL}/set/${parts.join('/')}`, {
-    headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
-  });
-  return (await res.json()).result;
-}
-
-async function redisDel(key) {
-  await fetch(`${REDIS_URL}/del/${encodeURIComponent(key)}`, {
-    headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
-  });
-}
+function redisGet(key)                      { return redis('GET', key); }
+function redisSet(key, value, exSeconds)    { return exSeconds ? redis('SET', key, value, 'EX', exSeconds) : redis('SET', key, value); }
+function redisDel(key)                      { return redis('DEL', key); }
 
 function hashPassword(password, salt) {
   return crypto.createHmac('sha256', salt).update(password).digest('hex');
