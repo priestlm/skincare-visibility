@@ -1252,6 +1252,19 @@ function readBody(req) {
   });
 }
 
+// ── Brand audit question builder ──────────────────────────────────────────────
+function buildBrandAuditQuestions(orgName, niche, categoryLabel) {
+  if (!orgName) return [];
+  const cat = niche || categoryLabel || 'its category';
+  return [
+    { question: `What is ${orgName}?`, search_intent: 'brand recognition', prompt_type: 'brand_audit' },
+    { question: `What products does ${orgName} sell?`, search_intent: 'product knowledge', prompt_type: 'brand_audit' },
+    { question: `Where can I buy ${orgName}?`, search_intent: 'availability', prompt_type: 'brand_audit' },
+    { question: `How does ${orgName} compare to other ${cat} brands?`, search_intent: 'comparison positioning', prompt_type: 'brand_audit' },
+    { question: `Is ${orgName} available in UK supermarkets?`, search_intent: 'retail availability', prompt_type: 'brand_audit' },
+  ];
+}
+
 // â”€â”€ In-memory result cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Persists across warm invocations of the same serverless instance.
 // Prevents repeated Gemini calls for the same URL within a warm window.
@@ -1380,6 +1393,11 @@ module.exports = async (req, res) => {
     ddgSummary: ddgSignal?.abstract || null,
     ddgTopics: ddgSignal?.topics || [],
     ddgInfobox: ddgSignal?.infobox || [],
+    brandAuditQuestions: buildBrandAuditQuestions(
+      displayTitle,
+      detectedNiche,
+      CATEGORY_DEFS[primary]?.label
+    ),
   };
 
   if (!weakEvidence) cacheSet(cacheKey, responseData);

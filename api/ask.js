@@ -85,13 +85,63 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const body = await readBody(req);
-  const { question, businessName } = body;
+  const { question, businessName, promptType } = body;
   if (!question) return res.status(400).json({ error: 'question is required' });
 
   const hasGroq = !!process.env.GROQ_API_KEY;
   const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;
   if (!hasGroq && !hasOpenRouter) {
     return res.status(503).json({ error: 'no_ai_provider' });
+  }
+
+  // Brand audit mode — assess what AI knows about a specific brand
+  if (promptType === 'brand_audit') {
+    const auditPrompt = `A person asked: "${question}"
+
+Answer based on your training knowledge about this brand or company. Be factual and honest — say "unknown" if you don't have reliable information.
+
+Return ONLY valid JSON:
+{
+  "recognised": true or false,
+  "response": "2-3 sentence answer you would give the person",
+  "products_mentioned": ["specific product 1", "specific product 2"],
+  "channels_mentioned": ["where they sell e.g. Waitrose, Amazon, own website"],
+  "confidence": "high or medium or low or unknown"
+}`;
+
+    async function auditAttempt(fn, provider) {
+      try {
+        const result = await fn();
+        if (result.status === 200) {
+          const text = result.body?.choices?.[0]?.message?.content || '';
+          const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+          const match = cleaned.match(/\{[\s\S]*\}/);
+          if (!match) return { failed: true };
+          const parsed = JSON.parse(match[0]);
+          return { ok: true, data: parsed };
+        }
+        return { failed: true };
+      } catch { return { failed: true }; }
+    }
+
+    if (hasGroq) {
+      const r = await auditAttempt(
+        () => tryOpenAI('https://api.groq.com/openai/v1/chat/completions', 'llama-3.3-70b-versatile', auditPrompt, process.env.GROQ_API_KEY, {}, 12000),
+        'groq'
+      );
+      if (r.ok) return res.status(200).json({ ...r.data, isBrandAudit: true });
+    }
+    if (hasOpenRouter) {
+      for (const model of ['meta-llama/llama-3.1-8b-instruct:free', 'qwen/qwen3-8b:free']) {
+        const r = await auditAttempt(
+          () => tryOpenAI('https://openrouter.ai/api/v1/chat/completions', model, auditPrompt, process.env.OPENROUTER_API_KEY,
+            { 'HTTP-Referer': 'https://visible.ai', 'X-Title': 'Visible AI' }, 12000),
+          'openrouter'
+        );
+        if (r.ok) return res.status(200).json({ ...r.data, isBrandAudit: true });
+      }
+    }
+    return res.status(200).json({ recognised: false, response: '', products_mentioned: [], channels_mentioned: [], confidence: 'unknown', isBrandAudit: true });
   }
 
   const prompt = `A person asked an AI assistant: "${question}"
