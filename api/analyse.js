@@ -1,6 +1,7 @@
 ﻿const https = require('https');
 const http = require('http');
 const { URL } = require('url');
+const { AI_OPTIMISATION_GUIDE } = require('./ai-optimisation-guide');
 
 // ── Upstash Redis question store ──────────────────────────────────────────────
 const KV_URL   = process.env.UPSTASH_REDIS_REST_URL;
@@ -653,6 +654,10 @@ RULES:
    DIVERSITY RULE: Each question must ask about a genuinely different product, use-case, or audience. Do NOT generate variations like “best X for Y” and “top X for Y” — they count as one question.${userLocation ? `
    LOCATION RULE: Include at least 3 location questions using “${[userLocation.town, userLocation.county].filter(Boolean).join('” or “')}” as the named place. Examples: “best [service] in ${userLocation.town}”, “where can I find [product] near ${userLocation.town}”, “[service] near ${userLocation.town} recommendations”.` : ''}
 6. visibility_gaps: name actual product types, page types, or information a buyer would want. Not “add more content” — say “no page for allergen information” or “no UK stockist map”.
+   Base your gaps on the AI optimisation principles below — e.g. missing FAQ content, thin product descriptions, no schema markup signals, no Google Business Profile signals, no stockist/availability page.
+
+REFERENCE — Google AI Optimisation Guide (use this to inform visibility_gaps):
+${AI_OPTIMISATION_GUIDE}
 
 prompt_type definitions:
 - discovery: “what's a good X for Y” or “best X for someone who Z”
@@ -810,7 +815,7 @@ async function topUpQuestions(aiResult, existingQs, brandPhrases, primaryKey, ne
   const allExisting = [...existingQs, ...storedFiltered];
   const alreadyHave = allExisting.slice(0, 12).map(q => `- ${q.question}`).join('\n');
 
-  const prompt = `You are generating search questions a real person would type into ChatGPT.
+  const prompt = `You are generating search questions a real person would type into ChatGPT or Google AI.
 
 Brand context:
 Category: ${category}${niche ? `\nNiche: ${niche}` : ''}
@@ -821,7 +826,12 @@ Generate exactly ${stillNeeded} questions. Casual, natural, plain English.
 
 RULES:
 - Do NOT name any specific brand or company
-- Cover a mix of: what's best for X, where to buy, comparing options, gift ideas, specific product types
+- Cover a DIVERSE mix of intent types — each question must have a different core intent:
+  discovery (best X for Y), location (where to get X near me), comparison (X vs Y),
+  occasion (X for a gift / event), availability (where to buy X online), specific product detail
+- No two questions should be near-identical variations of each other
+- Base questions on the real buyer journeys described in this AI optimisation reference:
+  ${AI_OPTIMISATION_GUIDE.split('\n').slice(0, 20).join('\n  ')}
 - Do not repeat:
 ${alreadyHave}
 
