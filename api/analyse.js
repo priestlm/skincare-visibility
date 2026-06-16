@@ -456,85 +456,73 @@ async function fetchDDGInstant(query) {
   } catch { return null; }
 }
 
-// DDG HTML search — scrape result snippets for brands with no entity page
-async function fetchDDGSearch(query) {
+// Wikipedia REST API — free, no API key, no bot detection
+async function fetchWikipedia(brandName) {
   try {
-    const zlib = require('zlib');
-    const q = encodeURIComponent(query);
-    const url = `https://html.duckduckgo.com/html/?q=${q}&kl=uk-en`;
-    const html = await new Promise((resolve, reject) => {
-      https.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'text/html',
-          'Accept-Language': 'en-GB,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate',
-        },
-      }, (res) => {
-        const chunks = [];
-        res.on('data', c => chunks.push(c));
-        res.on('end', () => {
-          const buf = Buffer.concat(chunks);
-          const enc = res.headers['content-encoding'];
-          if (enc === 'gzip') {
-            zlib.gunzip(buf, (err, decoded) => {
-              if (err) resolve(buf.toString('utf8'));
-              else resolve(decoded.toString('utf8'));
-            });
-          } else if (enc === 'deflate') {
-            zlib.inflate(buf, (err, decoded) => {
-              if (err) resolve(buf.toString('utf8'));
-              else resolve(decoded.toString('utf8'));
-            });
-          } else {
-            resolve(buf.toString('utf8'));
-          }
-        });
-      }).setTimeout(8000, function() { this.destroy(); reject(new Error('timeout')); })
-        .on('error', reject);
+    // First search for the brand to find the right article title
+    const searchQ = encodeURIComponent(brandName);
+    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchQ}&srlimit=3&format=json&origin=*`;
+    const searchData = await new Promise((resolve, reject) => {
+      https.get(searchUrl, { headers: { 'User-Agent': 'Visible-brand-research/1.0' } }, (res) => {
+        let raw = '';
+        res.setEncoding('utf8');
+        res.on('data', c => { raw += c; });
+        res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve(null); } });
+      }).setTimeout(6000, function() { this.destroy(); reject(new Error('timeout')); }).on('error', reject);
     });
 
-    function decodeHtml(s) {
-      return s.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');
-    }
+    const hits = searchData?.query?.search || [];
+    if (!hits.length) return null;
 
-    const snippets = [];
-    const titles = [];
-    // Match snippets: text after result__snippet until </a>
-    const snippetRe = /result__snippet[^>]*>([\s\S]{0,400}?)<\/a>/g;
-    let m;
-    while ((m = snippetRe.exec(html)) !== null && snippets.length < 6) {
-      const text = decodeHtml(m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
-      if (text.length > 30) snippets.push(text);
-    }
-    const titleRe = /result__a[^>]*>([\s\S]{0,200}?)<\/a>/g;
-    while ((m = titleRe.exec(html)) !== null && titles.length < 5) {
-      const text = decodeHtml(m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
-      if (text.length > 5 && !text.startsWith('http')) titles.push(text);
-    }
-    return snippets.length ? { snippets, titles } : null;
+    // Use the top hit that looks like a brand/company match
+    const brandLower = brandName.toLowerCase();
+    const hit = hits.find(h => h.title.toLowerCase().includes(brandLower.split(' ')[0])) || hits[0];
+    if (!hit) return null;
+
+    // Fetch the page summary
+    const titleEnc = encodeURIComponent(hit.title);
+    const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${titleEnc}`;
+    const summaryData = await new Promise((resolve, reject) => {
+      https.get(summaryUrl, { headers: { 'User-Agent': 'Visible-brand-research/1.0' } }, (res) => {
+        let raw = '';
+        res.setEncoding('utf8');
+        res.on('data', c => { raw += c; });
+        res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve(null); } });
+      }).setTimeout(6000, function() { this.destroy(); reject(new Error('timeout')); }).on('error', reject);
+    });
+
+    if (!summaryData || summaryData.type === 'disambiguation') return null;
+    const extract = (summaryData.extract || '').slice(0, 600).trim();
+    if (!extract) return null;
+
+    return {
+      snippets: [extract],
+      titles: [summaryData.title || brandName],
+      wikiTitle: summaryData.title || '',
+      description: summaryData.description || '',
+    };
   } catch { return null; }
 }
 
-// Merge DDG instant + search signals into one rich object
-function mergeDDGSignals(instant, search, brandGuess) {
-  const snippetText = search?.snippets?.join(' ') || '';
-  const titleText = search?.titles?.join(' ') || '';
+// Merge DDG instant + Wikipedia signals into one rich object
+function mergeDDGSignals(instant, wiki, brandGuess) {
+  const wikiText = wiki?.snippets?.join(' ') || '';
   return {
-    heading: instant?.heading || brandGuess || '',
-    entity: instant?.entity || '',
-    abstract: instant?.abstract || (search?.snippets?.[0] || ''),
+    heading: instant?.heading || wiki?.wikiTitle || brandGuess || '',
+    entity: instant?.entity || wiki?.description || '',
+    abstract: instant?.abstract || wiki?.snippets?.[0] || '',
     topics: instant?.topics || [],
     infobox: instant?.infobox || [],
-    searchSnippets: search?.snippets || [],
-    searchTitles: search?.titles || [],
+    searchSnippets: wiki?.snippets || [],
+    searchTitles: wiki?.titles || [],
+    wikiDescription: wiki?.description || '',
     // Combined text blob for AI and keyword scoring
     richText: [
       instant?.abstract || '',
       instant?.topics?.join(' ') || '',
       instant?.infobox?.join(' ') || '',
-      snippetText,
-      titleText,
+      wikiText,
+      wiki?.description || '',
     ].filter(Boolean).join(' '),
   };
 }
@@ -1499,16 +1487,16 @@ module.exports = async (req, res) => {
   const fetchedOk = false;
   const analysisStatus = 'ok';
 
-  // Multi-signal DDG research — parallel instant answers + HTML search snippets
+  // Multi-signal brand research — DDG Instant Answers + Wikipedia (parallel)
   const hostname = (() => { try { return new URL(targetUrl).hostname; } catch { return ''; } })();
   const brandGuess = brandName || brandFromHostname(hostname);
-  const [ddgInstant, ddgInstant2, ddgSearch] = await Promise.all([
+  const [ddgInstant, ddgInstant2, wikiData] = await Promise.all([
     fetchDDGInstant(brandGuess),
-    fetchDDGInstant(brandGuess + ' brand'),
-    fetchDDGSearch(brandGuess + ' company products'),
+    fetchDDGInstant(brandGuess + ' brand UK'),
+    fetchWikipedia(brandGuess),
   ]);
   const instantBest = ddgInstant?.abstract ? ddgInstant : (ddgInstant2?.abstract ? ddgInstant2 : null);
-  const ddgSignal = mergeDDGSignals(instantBest, ddgSearch, brandGuess);
+  const ddgSignal = mergeDDGSignals(instantBest, wikiData, brandGuess);
 
   // AI generates brand-specific questions using DDG data as context
   const aiRaw = await callAI({ title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' }, targetUrl, 'ok', ddgSignal, userLocation);
