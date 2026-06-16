@@ -888,6 +888,31 @@ Return ONLY a valid JSON array of strings:
   return [...storedFiltered, ...aiExtras].slice(0, needed);
 }
 
+// â”€â”€ DDG-only categorization (no AI needed) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function categorizeDDG(ddgSignal, targetUrl, brandNameHint) {
+  const hostname = (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, '').replace(/[\-_.]/g, ' '); } catch { return ''; } })();
+  const text = [
+    ddgSignal?.abstract || '',
+    ddgSignal?.heading || '',
+    (ddgSignal?.topics || []).join(' '),
+    (ddgSignal?.infobox || []).join(' '),
+    brandNameHint || '',
+    hostname,
+  ].join(' ').toLowerCase();
+
+  const scores = {};
+  for (const [key, def] of Object.entries(CATEGORY_DEFS)) {
+    scores[key] = def.keywords.filter(kw => text.includes(kw.toLowerCase())).length;
+  }
+
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  const topScore = sorted[0][1];
+  const primary = topScore > 0 ? sorted[0][0] : 'general-retail';
+  const secondary = sorted[1] && sorted[1][1] >= Math.max(1, topScore / 2) ? sorted[1][0] : null;
+  const categories = secondary ? [primary, secondary] : [primary];
+  return { primary, categories, weak: topScore === 0 };
+}
+
 // â”€â”€ AI orchestrator: Groq â†' OpenRouter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function callAI(extracted, targetUrl, analysisStatus, ddgSignal, userLocation) {
   const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLocation);
@@ -1377,47 +1402,19 @@ module.exports = async (req, res) => {
   const ddgQuery = (brandName || '') + (brandName ? ' brand products UK' : new URL(targetUrl).hostname.replace(/^www\./, '') + ' brand UK');
   const ddgSignal = await fetchDuckDuckGo(ddgQuery);
 
-  if (override && override.summary) extracted.metaDesc = override.summary;
+  // DDG-only categorization — no AI call needed
+  const { primary, categories, weak: weakEvidence } = categorizeDDG(ddgSignal, targetUrl, brandName);
 
-  // Call AI with DDG signal — no site scraping
-  const aiRaw = await callAI(extracted, targetUrl, 'ok', ddgSignal, userLocation);
-  const ai = aiRaw && !aiRaw._error ? aiRaw : null;
+  const displayTitle = ddgSignal?.heading || brandName || new URL(targetUrl).hostname.replace(/^www\./, '');
+  const summary = ddgSignal?.abstract
+    ? ddgSignal.abstract
+    : `Visibility preview for ${displayTitle} based on category signals.`;
 
-  if (!ai) {
-    // AI failed — try question store as emergency fallback (category unknown, use domain guess)
-    return res.status(200).json({
-      fetchedOk: false, needsManualCategory: true, aiAssisted: false,
-      aiError: aiRaw?._error || 'ai_failed',
-      analysis_status: 'failed',
-      title: brandName || targetUrl, summary: '', categories: [], primary: null, questions: [], riskNarrative: '',
-    });
-  }
+  const rawQuestions = buildQuestions(categories);
+  const questionsRich = rawQuestions.map(q => ({ question: q, search_intent: '', prompt_type: 'discovery' }));
+  const questions = rawQuestions;
 
-  const mapped = applyGeminiResult(ai, brandName || '');
-  let { primaryKey: primary, categories, questions, questionsRich, weakEvidence,
-    brandName: aiBrand, organisationName, summary, customerType,
-    detectedNiche, productsFound, productsStructured,
-    customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
-
-  // Deduplicate similar questions before top-up
-  questionsRich = dedupQuestions(questionsRich);
-  questions = questionsRich.map(q => q.question);
-
-  // Top-up: if AI gave fewer than 20 questions after filtering, ask for more
-  const MIN_QUESTIONS = 20;
-  if (questionsRich.length < MIN_QUESTIONS) {
-    const brandPhrases = [organisationName, aiBrand, brandName]
-      .map(s => (s || '').toLowerCase().trim()).filter(s => s.length > 3);
-    const needed = MIN_QUESTIONS - questionsRich.length;
-    console.log(`Top-up needed: have ${questionsRich.length}, requesting ${needed} more`);
-    const extra = await topUpQuestions(ai, questionsRich, brandPhrases, primary, needed + 3); // ask for a few extra to allow for filter losses
-    const combined = [...questionsRich, ...extra.slice(0, needed)];
-    questionsRich = combined;
-    questions = combined.map(q => q.question);
-    weakEvidence = combined.length < 3;
-  }
-
-  const displayTitle = organisationName || aiBrand || brandName || targetUrl;
+  const customerType = CUSTOMER_TYPES[primary] || CUSTOMER_TYPES.other;
   const riskNarrative = buildRiskNarrative(displayTitle, primary, categories);
   const categoryLabels = categories.map(c => ({
     key: c, label: CATEGORY_DEFS[c]?.label || c, primary: c === primary,
@@ -1425,22 +1422,18 @@ module.exports = async (req, res) => {
 
   const responseData = {
     fetchedOk: false, needsManualCategory: false, analysis_status: 'ok',
-    aiAssisted: true, manual: false,
-    title: displayTitle, organisationName: organisationName || null, summary,
-    primary, niche: detectedNiche || null,
-    productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps,
-    locationSignals: locationSignals || null,
+    aiAssisted: false, manual: false,
+    title: displayTitle, organisationName: displayTitle, summary,
+    primary, niche: null,
+    productsFound: false, productsStructured: [], customerChannels: [], publicSignals: [], visibilityGaps: [],
+    locationSignals: null,
     categories: categoryLabels, customerType,
     questions, questionsRich, weakEvidence, riskNarrative,
-    confidence: ai.confidence_score,
+    confidence: weakEvidence ? 0.4 : 0.7,
     ddgSummary: ddgSignal?.abstract || null,
     ddgTopics: ddgSignal?.topics || [],
     ddgInfobox: ddgSignal?.infobox || [],
-    brandAuditQuestions: buildBrandAuditQuestions(
-      displayTitle,
-      detectedNiche,
-      CATEGORY_DEFS[primary]?.label
-    ),
+    brandAuditQuestions: buildBrandAuditQuestions(displayTitle, null, CATEGORY_DEFS[primary]?.label),
   };
 
   if (!weakEvidence) cacheSet(cacheKey, responseData);
