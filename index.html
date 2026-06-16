@@ -1841,7 +1841,7 @@
           email_already_registered: 'An account with this email already exists — try signing in instead.',
           password_too_short: 'Password must be at least 6 characters.',
         };
-        errEl.textContent = msgs[data.error] || 'Something went wrong — please try again.';
+        errEl.textContent = msgs[data.error] || ('Something went wrong: ' + (data.detail || data.error));
         errEl.style.display = 'block';
       } else {
         // Also notify operator via Formspree

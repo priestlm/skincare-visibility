@@ -104,7 +104,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ token, user: safeUser(user) });
     } catch (e) {
       console.error('register error', e.message);
-      return res.status(500).json({ error: 'server_error' });
+      return res.status(500).json({ error: 'server_error', detail: e.message });
     }
   }
 
