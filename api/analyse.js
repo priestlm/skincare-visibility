@@ -758,11 +758,11 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, t
   }
 }
 
-// Groq — blocks Vercel IPs; kept as option if hosting changes
 function callGroq(prompt) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return Promise.resolve(null);
-  return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions', 'llama-3.3-70b-versatile', apiKey, prompt, 'Groq', 25000);
+  // llama-3.1-8b-instant: 6000 RPM free tier (vs 30 RPM for 70b)
+  return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', apiKey, prompt, 'Groq', 25000);
 }
 
 // OpenRouter — works from Vercel, free tier (200 RPD), no credit card required
@@ -917,23 +917,20 @@ function categorizeDDG(ddgSignal, targetUrl, brandNameHint) {
 async function callAI(extracted, targetUrl, analysisStatus, ddgSignal, userLocation) {
   const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLocation);
 
-  // Gemini primary — works from Vercel IPs, free tier
-  const geminiResult = await callGemini(prompt);
-  console.log('Gemini result:', geminiResult ? JSON.stringify({ _error: geminiResult._error, _errorDetail: geminiResult._errorDetail }).slice(0,200) : 'null (no key)');
-  if (geminiResult && !geminiResult._error) return geminiResult;
-
-  // OpenRouter fallback — free tier
-  const openRouterResult = await callOpenRouter(prompt);
-  console.log('OpenRouter result:', openRouterResult ? JSON.stringify({ _error: openRouterResult._error }).slice(0,200) : 'null (no key)');
-  if (openRouterResult && !openRouterResult._error) return openRouterResult;
-
-  // Groq last resort (blocked on Vercel but worth trying)
+  // Groq primary — 6000 RPM free tier with 8b-instant model
   const groqResult = await callGroq(prompt);
-  console.log('Groq result:', groqResult ? JSON.stringify({ _error: groqResult._error }).slice(0,200) : 'null (no key)');
   if (groqResult && !groqResult._error) return groqResult;
 
-  const lastErr = groqResult || openRouterResult || geminiResult || { _error: 'no_ai_provider' };
-  return { ...lastErr, _allErrors: { gemini: geminiResult?._error || 'null', openrouter: openRouterResult?._error || 'null', groq: groqResult?._error || 'null' } };
+  // Gemini fallback
+  const geminiResult = await callGemini(prompt);
+  if (geminiResult && !geminiResult._error) return geminiResult;
+
+  // OpenRouter last resort
+  const openRouterResult = await callOpenRouter(prompt);
+  if (openRouterResult && !openRouterResult._error) return openRouterResult;
+
+  const lastErr = openRouterResult || geminiResult || groqResult || { _error: 'no_ai_provider' };
+  return { ...lastErr, _allErrors: { groq: groqResult?._error || 'null', gemini: geminiResult?._error || 'null', openrouter: openRouterResult?._error || 'null' } };
 }
 
 // â”€â”€ Niche question templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
