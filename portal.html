@@ -1200,14 +1200,15 @@
 
   // ── Compute aggregated stats from org's queryBank (+ legacy reports fallback) ──
   function computeAggregated(org, allReports, maxRuns) {
+    function normU(u) { return (u || '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '').toLowerCase(); }
     var queryBank  = (org.queryBank  || []).map(function(q) { return { question: q.question, promptType: q.promptType, results: q.results.slice() }; });
     var runHistory = (org.runHistory || []).slice();
 
     // Backwards-compat: synthesise from legacy user.reports if no queryBank yet
     if (queryBank.length === 0 && allReports.length > 0) {
-      var orgNorm = normalizeUrl(org.url);
+      var orgNorm = normU(org.url);
       var orgReps = allReports.filter(function(r) {
-        return r.business && normalizeUrl(r.business.url || '') === orgNorm;
+        return r.business && normU(r.business.url || '') === orgNorm;
       }).sort(function(a, b) { return (a.savedAt || '').localeCompare(b.savedAt || ''); });
       orgReps.forEach(function(r) {
         (r.queryResults || []).filter(function(q) { return !q.error; }).forEach(function(q) {
