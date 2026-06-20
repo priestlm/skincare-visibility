@@ -172,23 +172,88 @@ module.exports = async (req, res) => {
     try {
       const user = await getSessionUser(req);
       if (!user) return res.status(401).json({ error: 'unauthenticated' });
+
+      const runDate = new Date().toISOString();
+      const queryResults = reportData.queryResults || [];
+
+      // ── Normalise URL for matching ──
+      function normUrl(u) {
+        try { return new URL((u || '').startsWith('http') ? u : 'https://' + u).hostname.replace(/^www\./, '').toLowerCase(); }
+        catch { return (u || '').toLowerCase().replace(/^www\./, ''); }
+      }
+
+      // ── Merge into org's queryBank ──
+      const orgUrl = (reportData.business && reportData.business.url) || '';
+      if (orgUrl) {
+        const normTarget = normUrl(orgUrl);
+        const org = (user.organisations || []).find(o => normUrl(o.url) === normTarget);
+        if (org) {
+          org.queryBank   = org.queryBank   || [];
+          org.runHistory  = org.runHistory  || [];
+
+          // Merge each valid query result into the bank
+          queryResults.filter(q => !q.error).forEach(q => {
+            let entry = org.queryBank.find(e => e.question === q.question);
+            if (!entry) {
+              entry = { question: q.question, promptType: q.promptType || 'general', results: [] };
+              org.queryBank.push(entry);
+            }
+            entry.results.push({
+              runDate,
+              businessMentioned: !!q.businessMentioned,
+              quality: q.quality || null,
+              competitors: (q.recommendations || []).map(r => r.name).filter(Boolean).slice(0, 6),
+            });
+            // Cap per-question history at 24 runs
+            if (entry.results.length > 24) entry.results = entry.results.slice(-24);
+          });
+
+          // Cap total unique questions in bank (most recently tested first)
+          if (org.queryBank.length > 80) {
+            org.queryBank.sort((a, b) => {
+              const lA = a.results[a.results.length - 1]?.runDate || '';
+              const lB = b.results[b.results.length - 1]?.runDate || '';
+              return lB.localeCompare(lA);
+            });
+            org.queryBank = org.queryBank.slice(0, 80);
+          }
+
+          // Record this run in history (for trend sparkline)
+          org.runHistory.push({
+            runDate,
+            score:   reportData.visibilityScore || 0,
+            totalQ:  queryResults.filter(q => !q.error).length,
+            mentions: reportData.mentionCount || 0,
+          });
+          if (org.runHistory.length > 24) org.runHistory = org.runHistory.slice(-24);
+
+          // Cache latest report metadata on the org
+          org.business         = reportData.business         || org.business;
+          org.lastRunAt        = runDate;
+          org.visibilityGaps   = (reportData.visibilityGaps   || []).slice(0, 10);
+          org.recommendations  = (reportData.recommendations  || []).slice(0, 5);
+          org.riskNarrative    = reportData.riskNarrative    || null;
+        }
+      }
+
+      // ── Also keep a trimmed individual report (for "view report" detail, backwards compat) ──
       user.reports = user.reports || [];
-      // Trim queryResults to reduce storage size
       const trimmed = {
         ...reportData,
-        savedAt: new Date().toISOString(),
-        queryResults: (reportData.queryResults || []).map(q => ({
-          question: q.question,
-          promptType: q.promptType,
+        savedAt: runDate,
+        queryResults: queryResults.map(q => ({
+          question:          q.question,
+          promptType:        q.promptType,
           businessMentioned: q.businessMentioned,
-          quality: q.quality,
-          recCount: q.recCount,
-          error: q.error || false,
-          recommendations: (q.recommendations || []).slice(0, 5),
+          quality:           q.quality,
+          recCount:          q.recCount,
+          error:             q.error || false,
+          recommendations:   (q.recommendations || []).slice(0, 5),
         })),
       };
       user.reports.unshift(trimmed);
       if (user.reports.length > 5) user.reports = user.reports.slice(0, 5);
+
       await redisSet(`user:${user.email}`, JSON.stringify(user));
       return res.status(200).json({ ok: true, user: safeUser(user) });
     } catch (e) {

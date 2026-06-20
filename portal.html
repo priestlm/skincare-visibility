@@ -371,6 +371,20 @@
     #report-nav-title { font-size: 12px }
   }
 
+  /* ── Aggregated org stats ── */
+  .org-agg { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft); display: flex; align-items: center; gap: 16px; flex-wrap: wrap }
+  .org-agg-score { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; background: linear-gradient(125deg, #818CF8, #34D399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; flex: none }
+  .org-agg-meta { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0 }
+  .org-agg-row { font-size: 12px; color: var(--ink-muted); line-height: 1.4 }
+  .org-agg-row strong { color: var(--ink-soft); font-weight: 600 }
+  .org-range-select { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .06em; border: 1px solid var(--border); background: var(--surface); color: var(--ink-muted); padding: 4px 8px; border-radius: 7px; cursor: pointer; transition: border-color .15s }
+  .org-range-select:focus { outline: none; border-color: var(--border-accent) }
+  .org-range-select option { background: #0C0E1A }
+
+  /* ── Sparkline ── */
+  .org-sparkline { margin-top: 14px; padding: 12px 14px; background: rgba(99,102,241,.05); border: 1px solid rgba(99,102,241,.12); border-radius: 10px }
+  .org-sparkline-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 8px }
+
   /* ── Accessibility utilities ── */
   .sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0 }
 
@@ -1176,6 +1190,103 @@
     btn.disabled = false; btn.textContent = 'Add website →';
   });
 
+  // ── Compute aggregated stats from org's queryBank (+ legacy reports fallback) ──
+  function computeAggregated(org, allReports, maxRuns) {
+    var queryBank  = (org.queryBank  || []).map(function(q) { return { question: q.question, promptType: q.promptType, results: q.results.slice() }; });
+    var runHistory = (org.runHistory || []).slice();
+
+    // Backwards-compat: synthesise from legacy user.reports if no queryBank yet
+    if (queryBank.length === 0 && allReports.length > 0) {
+      var orgNorm = normalizeUrl(org.url);
+      var orgReps = allReports.filter(function(r) {
+        return r.business && normalizeUrl(r.business.url || '') === orgNorm;
+      }).sort(function(a, b) { return (a.savedAt || '').localeCompare(b.savedAt || ''); });
+      orgReps.forEach(function(r) {
+        (r.queryResults || []).filter(function(q) { return !q.error; }).forEach(function(q) {
+          var entry = queryBank.find(function(e) { return e.question === q.question; });
+          if (!entry) { entry = { question: q.question, promptType: q.promptType, results: [] }; queryBank.push(entry); }
+          entry.results.push({
+            runDate: r.savedAt, businessMentioned: !!q.businessMentioned, quality: q.quality,
+            competitors: (q.recommendations || []).map(function(rec) { return rec.name; }).filter(Boolean),
+          });
+        });
+        if (!runHistory.find(function(h) { return h.runDate === r.savedAt; })) {
+          runHistory.push({ runDate: r.savedAt, score: r.visibilityScore || 0, totalQ: (r.queryResults || []).filter(function(q){return !q.error;}).length, mentions: r.mentionCount || 0 });
+        }
+      });
+      runHistory.sort(function(a, b) { return (a.runDate || '').localeCompare(b.runDate || ''); });
+    }
+
+    // Filter to last maxRuns if requested
+    var filteredHistory = runHistory;
+    if (maxRuns && maxRuns < runHistory.length) {
+      filteredHistory = runHistory.slice(-maxRuns);
+      var cutoff = filteredHistory[0].runDate;
+      queryBank = queryBank.map(function(q) {
+        return { question: q.question, promptType: q.promptType, results: q.results.filter(function(r) { return r.runDate >= cutoff; }) };
+      }).filter(function(q) { return q.results.length > 0; });
+    }
+
+    // Current status per query = most recent result
+    var current = queryBank.map(function(q) {
+      if (!q.results.length) return null;
+      return { question: q.question, promptType: q.promptType, latest: q.results[q.results.length - 1], allResults: q.results };
+    }).filter(Boolean);
+
+    var totalQ   = current.length;
+    var mentions = current.filter(function(r) { return r.latest.businessMentioned; }).length;
+    var score    = totalQ ? Math.round(mentions / totalQ * 100) : 0;
+
+    // Competitor frequency across all results in gaps
+    var compFreq = {};
+    current.forEach(function(r) {
+      r.allResults.forEach(function(res) {
+        if (!res.businessMentioned) {
+          (res.competitors || []).forEach(function(c) { compFreq[c] = (compFreq[c] || 0) + 1; });
+        }
+      });
+    });
+    var topComps = Object.keys(compFreq).map(function(n) { return { name: n, count: compFreq[n] }; })
+      .sort(function(a, b) { return b.count - a.count; }).slice(0, 5);
+
+    return { score: score, totalQ: totalQ, mentions: mentions, topComps: topComps, runCount: filteredHistory.length, runHistory: filteredHistory };
+  }
+
+  // ── Render a sparkline SVG from runHistory ──
+  function makeSpark(runHistory) {
+    if (!runHistory || runHistory.length < 2) return '';
+    var runs = runHistory.slice(-8);
+    var n = runs.length;
+    var W = 100, H = 40, PAD = 6;
+    var scores = runs.map(function(r) { return r.score || 0; });
+    var minS = Math.min.apply(null, scores), maxS = Math.max.apply(null, scores);
+    var range = maxS - minS || 10;
+    var pts = runs.map(function(r, i) {
+      return {
+        x: PAD + (i / (n - 1)) * (W - PAD * 2),
+        y: PAD + (1 - (r.score - minS) / range) * (H - PAD * 2),
+        s: r.score, d: r.runDate
+      };
+    });
+    var polyPts = pts.map(function(p) { return p.x + ',' + p.y; }).join(' ');
+    var last = pts[pts.length - 1];
+    var uid = 'sp' + Math.random().toString(36).slice(2, 7);
+    var dots = pts.map(function(p, i) {
+      return i === pts.length - 1
+        ? '<circle cx="' + p.x + '" cy="' + p.y + '" r="3.5" fill="#34D399" stroke="rgba(52,211,153,.3)" stroke-width="4"/>'
+        : '<circle cx="' + p.x + '" cy="' + p.y + '" r="2" fill="#818CF8"/>';
+    }).join('');
+    var scoreLabel = '<text x="' + (last.x + 5) + '" y="' + (last.y + 4) + '" font-family="JetBrains Mono,monospace" font-size="8" fill="#34D399" font-weight="600">' + last.s + '%</text>';
+    return '<svg viewBox="0 0 ' + (W + 30) + ' ' + H + '" width="100%" height="' + H + '" style="display:block;overflow:visible" aria-hidden="true">' +
+      '<defs>' +
+      '<linearGradient id="' + uid + 'l" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#6366F1"/><stop offset="100%" stop-color="#34D399"/></linearGradient>' +
+      '<linearGradient id="' + uid + 'f" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6366F1" stop-opacity=".18"/><stop offset="100%" stop-color="#6366F1" stop-opacity="0"/></linearGradient>' +
+      '</defs>' +
+      '<polygon points="' + polyPts + ' ' + last.x + ',' + H + ' ' + PAD + ',' + H + '" fill="url(#' + uid + 'f)"/>' +
+      '<polyline points="' + polyPts + '" stroke="url(#' + uid + 'l)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
+      dots + scoreLabel + '</svg>';
+  }
+
   // ── Render organisations ──
   function renderOrgs() {
     var orgs = (currentUser && currentUser.organisations) || [];
@@ -1222,37 +1333,79 @@
       });
     }
 
-    body.innerHTML = orgs.map(function(org, idx) {
+    // Build org cards (initial render at maxRuns=null = all time)
+    function buildOrgCard(org, idx, maxRuns) {
       var orgDomain = (org.url || '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '');
-      var orgReports = getOrgReports(org.url);
+      var agg = computeAggregated(org, allReports, maxRuns || null);
+      var hasData = agg.totalQ > 0;
+      var runHistory = agg.runHistory || [];
 
+      // ── Aggregated stats block ──
+      var aggHtml = '';
+      if (hasData) {
+        var topComp = agg.topComps[0];
+        var delta = '';
+        if (runHistory.length >= 2) {
+          var diff = runHistory[runHistory.length - 1].score - runHistory[0].score;
+          if (diff > 0) delta = '<span style="color:var(--success);font-size:11px;margin-left:4px">↑ +' + diff + ' pts</span>';
+          else if (diff < 0) delta = '<span style="color:var(--danger);font-size:11px;margin-left:4px">↓ ' + diff + ' pts</span>';
+        }
+        var rangeSelect = runHistory.length >= 2
+          ? '<select class="org-range-select" data-org-idx="' + idx + '" aria-label="Score range">' +
+              '<option value="0"' + (!maxRuns ? ' selected' : '') + '>All time</option>' +
+              (runHistory.length >= 3 ? '<option value="3"' + (maxRuns === 3 ? ' selected' : '') + '>Last 3 runs</option>' : '') +
+              '<option value="1"' + (maxRuns === 1 ? ' selected' : '') + '>Last run</option>' +
+            '</select>'
+          : '';
+
+        aggHtml =
+          '<div class="org-agg">' +
+            '<span class="org-agg-score">' + agg.score + '%' + delta + '</span>' +
+            '<div class="org-agg-meta">' +
+              '<div class="org-agg-row"><strong>' + agg.totalQ + '</strong> queries evaluated · <strong>' + agg.mentions + '</strong> appearances</div>' +
+              (topComp ? '<div class="org-agg-row">Top gap: <strong>' + x(topComp.name) + '</strong> (' + topComp.count + ' queries)</div>' : '') +
+              '<div class="org-agg-row" style="color:var(--ink-muted);margin-top:2px"><strong>' + agg.runCount + '</strong> report' + (agg.runCount !== 1 ? 's' : '') + ' in dataset</div>' +
+            '</div>' +
+            rangeSelect +
+          '</div>';
+      }
+
+      // ── Sparkline ──
+      var sparkHtml = '';
+      if (runHistory.length >= 2) {
+        var monthFmt = function(d) { try { return new Date(d).toLocaleDateString('en-GB', { month: 'short' }); } catch(e) { return ''; } };
+        var runLabels = runHistory.slice(-8).map(function(r) {
+          return '<span style="font-size:10px;color:var(--ink-muted);font-family:\'JetBrains Mono\',monospace">' + monthFmt(r.runDate) + ' <strong style="color:var(--ink-soft)">' + r.score + '%</strong></span>';
+        }).join('<span style="color:var(--border);padding:0 4px">·</span>');
+
+        sparkHtml =
+          '<div class="org-sparkline">' +
+            '<div class="org-sparkline-title">Visibility trend</div>' +
+            makeSpark(runHistory) +
+            '<div style="display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px">' + runLabels + '</div>' +
+          '</div>';
+      }
+
+      // ── Run history rows ──
       var histRows;
-      if (orgReports.length === 0) {
+      var orgReports = getOrgReports(org.url);
+      if (!hasData && orgReports.length === 0) {
         histRows = '<div class="org-hist-empty">No reports yet — generate a report to start building your visibility history for this website.</div>';
-      } else {
+      } else if (orgReports.length > 0) {
         histRows = orgReports.slice(0, 3).map(function(r) {
-          var score = r.visibilityScore || 0;
-          var totalQ = r.totalQ || (r.queryResults && r.queryResults.length) || null;
-          var mentions = typeof r.mentionCount !== 'undefined' ? r.mentionCount : null;
-          var comps = (r.topCompetitors || []).length;
+          var sc = r.visibilityScore || 0;
           var allIdx = allReports.indexOf(r);
           return '<div class="org-hist-item">' +
             '<span class="org-hist-date">' + fmt(r.savedAt) + '</span>' +
-            '<span class="score-pill ' + scoreTierClass(score) + '" style="font-size:11px;padding:2px 8px">' + score + '% &middot; ' + scoreTierLabel(score) + '</span>' +
-            '<div class="org-hist-stats">' +
-              (totalQ !== null ? '<span class="org-hist-stat"><strong>' + totalQ + '</strong> queries</span>' : '') +
-              (mentions !== null ? '<span class="org-hist-stat"><strong>' + mentions + '</strong> appearances</span>' : '') +
-              (comps > 0 ? '<span class="org-hist-stat"><strong>' + comps + '</strong> competitors</span>' : '') +
-            '</div>' +
+            '<span class="score-pill ' + scoreTierClass(sc) + '" style="font-size:11px;padding:2px 8px">' + sc + '%</span>' +
             '<button class="btn-view-hist" type="button" data-hist-idx="' + allIdx + '" aria-label="View report from ' + fmt(r.savedAt) + '">View →</button>' +
           '</div>';
         }).join('');
-        if (orgReports.length > 3) {
-          histRows += '<div class="org-hist-more">+ ' + (orgReports.length - 3) + ' older report' + (orgReports.length - 3 !== 1 ? 's' : '') + ' — see Saved reports below</div>';
-        }
+      } else {
+        histRows = '';
       }
 
-      return '<div class="org-item">' +
+      return '<div class="org-item" data-org-idx="' + idx + '">' +
         '<div class="org-icon">' +
           '<img src="https://logo.clearbit.com/' + x(orgDomain) + '" ' +
             'onerror="this.onerror=null;this.src=\'https://www.google.com/s2/favicons?domain=' + x(orgDomain) + '&sz=64\'" ' +
@@ -1261,21 +1414,41 @@
         '<div class="org-info">' +
           '<div class="org-name">' + x(org.name) + '</div>' +
           '<div class="org-url">' + x(org.url) + '</div>' +
-          '<div class="org-added">Added ' + fmt(org.addedAt) + '</div>' +
-          '<div class="org-hist"><div class="org-hist-title">Report history</div>' + histRows + '</div>' +
+          aggHtml +
+          sparkHtml +
+          (histRows ? '<div class="org-hist"><div class="org-hist-title">Individual reports</div>' + histRows + '</div>' : '') +
         '</div>' +
         '<button class="btn-run" type="button" data-org-idx="' + idx + '" aria-label="Generate report for ' + x(org.name) + '">Generate report →</button>' +
       '</div>';
-    }).join('');
+    }
 
-    body.querySelectorAll('.btn-run[data-org-idx]').forEach(function(btn) {
-      var org = orgs[parseInt(btn.dataset.orgIdx, 10)];
-      if (org) btn.addEventListener('click', function() { runFullReport(org.url, org.name); });
+    body.innerHTML = orgs.map(function(org, idx) { return buildOrgCard(org, idx, null); }).join('');
+
+    // Range filter change — re-render just the affected org card
+    body.addEventListener('change', function(e) {
+      if (!e.target.classList.contains('org-range-select')) return;
+      var orgIdx = parseInt(e.target.dataset.orgIdx, 10);
+      var maxR = parseInt(e.target.value, 10) || null;
+      var card = body.querySelector('.org-item[data-org-idx="' + orgIdx + '"]');
+      if (card) {
+        var newCard = document.createElement('div');
+        newCard.innerHTML = buildOrgCard(orgs[orgIdx], orgIdx, maxR);
+        card.replaceWith(newCard.firstChild);
+        bindOrgButtons();
+      }
     });
-    body.querySelectorAll('.btn-view-hist[data-hist-idx]').forEach(function(btn) {
-      var report = allReports[parseInt(btn.dataset.histIdx, 10)];
-      if (report) btn.addEventListener('click', function() { viewSavedReport(report); });
-    });
+
+    function bindOrgButtons() {
+      body.querySelectorAll('.btn-run[data-org-idx]').forEach(function(btn) {
+        var org = orgs[parseInt(btn.dataset.orgIdx, 10)];
+        if (org) btn.addEventListener('click', function() { runFullReport(org.url, org.name); });
+      });
+      body.querySelectorAll('.btn-view-hist[data-hist-idx]').forEach(function(btn) {
+        var report = allReports[parseInt(btn.dataset.histIdx, 10)];
+        if (report) btn.addEventListener('click', function() { viewSavedReport(report); });
+      });
+    }
+    bindOrgButtons();
   }
 
   // ── Render previews ──
