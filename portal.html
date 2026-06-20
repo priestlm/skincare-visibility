@@ -205,14 +205,22 @@
   .org-name { font-weight: 600; font-size: 15px; color: var(--ink) }
   .org-url { font-size: 12px; color: var(--ink-muted); font-family: 'JetBrains Mono', monospace; margin-top: 2px }
   .org-added { font-size: 11px; color: var(--ink-muted); margin-top: 3px }
+  .org-actions { display: flex; flex-direction: column; gap: 7px; flex: none; align-items: stretch }
   .btn-run {
     padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer;
     background: linear-gradient(135deg, var(--accent), var(--accent-warm));
     color: #fff; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13px;
-    white-space: nowrap; flex: none;
+    white-space: nowrap; flex: none; text-align: center;
     transition: opacity .15s;
   }
   .btn-run:hover { opacity: .88 }
+  .btn-view-report {
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; white-space: nowrap; text-align: center;
+    border: 1px solid var(--border-accent); background: rgba(99,102,241,.07);
+    color: var(--accent-bright); font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13px;
+    transition: background .15s;
+  }
+  .btn-view-report:hover { background: rgba(99,102,241,.14) }
 
   /* ── Add URL section ── */
   .add-url-form { display: flex; flex-direction: column; gap: 10px; margin-top: 16px }
@@ -1418,7 +1426,12 @@
           sparkHtml +
           (histRows ? '<div class="org-hist"><div class="org-hist-title">Individual reports</div>' + histRows + '</div>' : '') +
         '</div>' +
-        '<button class="btn-run" type="button" data-org-idx="' + idx + '" aria-label="Generate report for ' + x(org.name) + '">Generate report →</button>' +
+        '<div class="org-actions">' +
+          (hasData
+            ? '<button class="btn-view-report" type="button" data-org-idx="' + idx + '" aria-label="View report for ' + x(org.name) + '">View report</button>'
+            : '') +
+          '<button class="btn-run" type="button" data-org-idx="' + idx + '" aria-label="' + (hasData ? 'Refresh data for ' : 'Run first report for ') + x(org.name) + '">' + (hasData ? 'Refresh data' : 'Run report →') + '</button>' +
+        '</div>' +
       '</div>';
     }
 
@@ -1442,6 +1455,10 @@
       body.querySelectorAll('.btn-run[data-org-idx]').forEach(function(btn) {
         var org = orgs[parseInt(btn.dataset.orgIdx, 10)];
         if (org) btn.addEventListener('click', function() { runFullReport(org.url, org.name); });
+      });
+      body.querySelectorAll('.btn-view-report[data-org-idx]').forEach(function(btn) {
+        var org = orgs[parseInt(btn.dataset.orgIdx, 10)];
+        if (org) btn.addEventListener('click', function() { viewFromQueryBank(org); });
       });
       body.querySelectorAll('.btn-view-hist[data-hist-idx]').forEach(function(btn) {
         var report = allReports[parseInt(btn.dataset.histIdx, 10)];
@@ -1547,11 +1564,42 @@
     rv.style.display = 'block';
     document.getElementById('report-nav-title').textContent = (reportData.business && reportData.business.name) || '';
     document.getElementById('gen-state').style.display = 'none';
-    document.getElementById('btn-save-report').style.display = 'none'; // already saved
+    document.getElementById('btn-save-report').style.display = 'none';
     document.getElementById('btn-export-pdf').style.display = '';
     document.getElementById('rpt-content').style.display = 'block';
     renderReport(reportData);
     enrichCompetitors(reportData.topCompetitors, (reportData.business && reportData.business.market) || null);
+  }
+
+  function viewFromQueryBank(org) {
+    var agg = computeAggregated(org, allReports, null);
+    var queryResults = (org.queryBank || []).map(function(entry) {
+      var latest = entry.results[entry.results.length - 1] || {};
+      return {
+        question: entry.question,
+        promptType: entry.promptType || 'general',
+        businessMentioned: !!latest.businessMentioned,
+        quality: latest.quality || null,
+        recCount: (latest.competitors || []).length,
+        error: false,
+        recommendations: (latest.competitors || []).map(function(name) { return { name: name }; }),
+      };
+    });
+    var reportData = {
+      generatedAt: org.lastRunAt || new Date().toISOString(),
+      savedAt: org.lastRunAt || new Date().toISOString(),
+      business: org.business || { name: org.name, url: org.url },
+      visibilityScore: agg.score,
+      mentionCount: agg.mentions,
+      totalQ: agg.totalQ,
+      queryResults: queryResults,
+      topCompetitors: agg.topComps.map(function(c) { return { name: c.name, count: c.count, credibility: c.count >= 3 ? 'confirmed' : c.count >= 2 ? 'moderate' : 'unverified' }; }),
+      visibilityGaps: org.visibilityGaps || [],
+      recommendations: org.recommendations || [],
+      riskNarrative: org.riskNarrative || '',
+      runHistory: agg.runHistory,
+    };
+    viewSavedReport(reportData);
   }
 
   // ── Render account sidebar ──
@@ -2565,21 +2613,29 @@
       setStep('build', 'done', 'Report ready');
       setPb(100);
 
+      // Auto-save into queryBank + runHistory
+      if (token) {
+        fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ action: 'save_report', reportData: reportData })
+        }).then(function(res) { return res.json(); }).then(function(data) {
+          if (data.user) {
+            currentUser = data.user;
+            renderOrgs();
+            renderSavedReports();
+            renderAccount();
+          }
+        }).catch(function() {});
+      }
+
       setTimeout(function() {
         document.getElementById('gen-state').style.display = 'none';
         document.getElementById('rpt-content').style.display = 'block';
         currentReportData = reportData;
         renderReport(reportData);
         enrichCompetitors(reportData.topCompetitors, analysis.market || null);
-        var exportBtn = document.getElementById('btn-export-pdf');
-        exportBtn.style.display = '';
-        if (token) {
-          var saveBtn = document.getElementById('btn-save-report');
-          saveBtn.style.display = '';
-          saveBtn.disabled = false;
-          saveBtn.className = 'btn-save-report';
-          saveBtn.textContent = 'Save Report';
-        }
+        document.getElementById('btn-export-pdf').style.display = '';
       }, 600);
 
     } catch(err) {
@@ -2594,9 +2650,7 @@
   document.getElementById('btn-back-dash').addEventListener('click', function() {
     document.getElementById('report-view').style.display = 'none';
     document.getElementById('portal').style.display = 'block';
-    document.getElementById('btn-save-report').style.display = 'none';
     document.getElementById('btn-export-pdf').style.display = 'none';
-    var sn = document.getElementById('save-note'); if (sn) sn.style.display = 'none';
     window.scrollTo(0, 0);
   });
 
@@ -2605,37 +2659,6 @@
     window.print();
   });
 
-  // Save report button
-  document.getElementById('btn-save-report').addEventListener('click', async function() {
-    var btn = this;
-    if (!currentReportData || !token) return;
-    btn.disabled = true;
-    btn.textContent = 'Saving…';
-    try {
-      var res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ action: 'save_report', reportData: currentReportData })
-      });
-      var data = await res.json();
-      if (res.ok && data.user) {
-        currentUser = data.user;
-        renderOrgs();
-        renderSavedReports();
-        renderAccount();
-        btn.className = 'btn-save-report saved';
-        btn.textContent = 'Saved to Tracker ✓';
-        var saveNote = document.getElementById('save-note');
-        if (saveNote) { saveNote.style.display = 'block'; }
-      } else {
-        btn.disabled = false;
-        btn.textContent = 'Save failed — retry';
-      }
-    } catch(e) {
-      btn.disabled = false;
-      btn.textContent = 'Save failed — retry';
-    }
-  });
 
   boot();
 })();
