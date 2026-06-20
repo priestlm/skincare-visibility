@@ -138,6 +138,9 @@ module.exports = async (req, res) => {
       if (user.organisations.some(o => o.url === orgUrl)) {
         return res.status(409).json({ error: 'url_already_added' });
       }
+      if (user.organisations.length >= 5) {
+        return res.status(409).json({ error: 'website_limit_reached' });
+      }
       user.organisations.push({ url: orgUrl, name: orgName || orgUrl, addedAt: new Date().toISOString() });
       await redisSet(`user:${user.email}`, JSON.stringify(user));
       return res.status(200).json({ user: safeUser(user) });
@@ -158,6 +161,38 @@ module.exports = async (req, res) => {
       await redisSet(`user:${user.email}`, JSON.stringify(user));
       return res.status(200).json({ ok: true });
     } catch (e) {
+      return res.status(500).json({ error: 'server_error' });
+    }
+  }
+
+  // ── Save report ──
+  if (action === 'save_report') {
+    const { reportData } = body;
+    if (!reportData) return res.status(400).json({ error: 'report_data_required' });
+    try {
+      const user = await getSessionUser(req);
+      if (!user) return res.status(401).json({ error: 'unauthenticated' });
+      user.reports = user.reports || [];
+      // Trim queryResults to reduce storage size
+      const trimmed = {
+        ...reportData,
+        savedAt: new Date().toISOString(),
+        queryResults: (reportData.queryResults || []).map(q => ({
+          question: q.question,
+          promptType: q.promptType,
+          businessMentioned: q.businessMentioned,
+          quality: q.quality,
+          recCount: q.recCount,
+          error: q.error || false,
+          recommendations: (q.recommendations || []).slice(0, 5),
+        })),
+      };
+      user.reports.unshift(trimmed);
+      if (user.reports.length > 5) user.reports = user.reports.slice(0, 5);
+      await redisSet(`user:${user.email}`, JSON.stringify(user));
+      return res.status(200).json({ ok: true, user: safeUser(user) });
+    } catch (e) {
+      console.error('save_report error', e.message);
       return res.status(500).json({ error: 'server_error' });
     }
   }

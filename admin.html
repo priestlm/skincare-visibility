@@ -593,6 +593,7 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
     </div>
 
     <div class="sb-foot">
+      <button class="clear-btn" id="domain-fixes-btn" onclick="openDomainFixes()" style="color:var(--accent-b);border-color:rgba(99,102,241,.2);margin-bottom:6px">⚙ Domain Fixes</button>
       <button class="clear-btn" id="clear-btn">Clear all saved reports</button>
     </div>
   </aside>
@@ -630,6 +631,47 @@ body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font
   </main>
 </div>
 
+<!-- Domain Fixes Modal -->
+<div id="df-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);overflow-y:auto">
+  <div style="max-width:760px;margin:40px auto;background:#0d0f1a;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:0;overflow:hidden">
+    <div style="padding:22px 28px 18px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px">
+      <div style="flex:1">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:#EEF2FF">Domain Fixes</div>
+        <div style="font-size:12px;color:rgba(238,242,255,.4);margin-top:3px">Runtime overrides stored in KV — no redeploy needed. Auto-learned entries are created automatically from successful analyses.</div>
+      </div>
+      <button onclick="closeDomainFixes()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:8px;color:rgba(238,242,255,.6);padding:6px 12px;font-size:13px;cursor:pointer">✕ Close</button>
+    </div>
+
+    <!-- Add / Edit form -->
+    <div style="padding:20px 28px;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(238,242,255,.35);margin-bottom:12px">Add / Edit Fix</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <input id="df-hostname" placeholder="Hostname — e.g. pizzahut.co.uk" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:9px 12px;color:#EEF2FF;font-family:'DM Sans',sans-serif;font-size:13px">
+        <input id="df-primary" placeholder="Primary category — e.g. food" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:9px 12px;color:#EEF2FF;font-family:'DM Sans',sans-serif;font-size:13px">
+        <input id="df-niche" placeholder="Niche — e.g. pizza delivery (optional)" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:9px 12px;color:#EEF2FF;font-family:'DM Sans',sans-serif;font-size:13px">
+        <input id="df-categories" placeholder="Extra categories — comma separated" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:9px 12px;color:#EEF2FF;font-family:'DM Sans',sans-serif;font-size:13px">
+      </div>
+      <textarea id="df-summary" placeholder="Brand summary (used as DDG bypass — prevents disambiguation)" rows="2" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:9px 12px;color:#EEF2FF;font-family:'DM Sans',sans-serif;font-size:13px;resize:vertical;margin-bottom:8px"></textarea>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="df-save-btn" onclick="saveDomainFix()" style="background:linear-gradient(135deg,#6366F1,#A78BFA);color:#fff;border:0;border-radius:8px;padding:9px 20px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;cursor:pointer">Save Fix</button>
+        <button onclick="clearDfForm()" style="background:none;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:9px 16px;color:rgba(238,242,255,.5);font-size:13px;cursor:pointer">Clear</button>
+        <span id="df-form-msg" style="font-size:12px;margin-left:4px"></span>
+      </div>
+    </div>
+
+    <!-- List -->
+    <div style="padding:20px 28px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(238,242,255,.35);flex:1">Stored Fixes (<span id="df-count">…</span>)</div>
+        <button onclick="loadDomainFixes()" style="background:none;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:5px 12px;color:rgba(238,242,255,.5);font-size:12px;cursor:pointer">↺ Refresh</button>
+      </div>
+      <div id="df-list">
+        <div style="color:rgba(238,242,255,.3);font-size:13px;text-align:center;padding:24px">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
 'use strict';
@@ -652,10 +694,22 @@ function tryLogin() {
 }
 document.getElementById('auth-submit').onclick = tryLogin;
 document.getElementById('auth-pw').onkeydown = e => { if (e.key==='Enter') tryLogin(); };
+
+// Auto-login: accept ?autorun=1 from portal (user is already authenticated via their account)
+const _urlParams = new URLSearchParams(window.location.search);
+const _autorun = _urlParams.get('autorun') === '1';
+if (_autorun) { sessionStorage.setItem('va','1'); }
+
 if (sessionStorage.getItem('va')==='1') {
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   renderList();
+  // If autorun, pre-fill form and kick off report immediately
+  if (_autorun && _urlParams.get('url')) {
+    document.getElementById('gen-url').value = decodeURIComponent(_urlParams.get('url'));
+    if (_urlParams.get('brand')) document.getElementById('gen-brand').value = decodeURIComponent(_urlParams.get('brand'));
+    setTimeout(() => generateReport(), 300);
+  }
 }
 
 /* ── Quick-fill buttons ── */
@@ -782,7 +836,7 @@ async function generateReport() {
     const auditQuestions = (analysis.brandAuditQuestions || []);
 
     // Step 2 — brand audit queries first (parallel, fast)
-    const BATCH = 1;
+    const BATCH = 3;
     const auditResults = [];
     if (auditQuestions.length) {
       setStep('query', 'active', 'Running brand recognition audit…');
@@ -819,7 +873,7 @@ async function generateReport() {
     setStep('query', 'active', '0/' + totalQ + ' queries complete');
 
     for (let i = 0; i < questions.length; i += BATCH) {
-      if (i > 0) await new Promise(r => setTimeout(r, 3000));
+      if (i > 0) await new Promise(r => setTimeout(r, 1500));
       const batch = questions.slice(i, i + BATCH);
       const settled = await Promise.allSettled(
         batch.map(q => fetchQuery(q.question, q.intent, q.promptType, orgName))
@@ -1984,6 +2038,124 @@ function setStep(id, state, status) {
 function scoreCls(s) { return s>=75?'hi':s>=40?'mi':'lo'; }
 function x(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function post(url, body) { return fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
+
+/* ── Domain Fixes ─────────────────────────────────────────────────────────── */
+// Admin secret stored in session so the user only types it once per session.
+var _dfSecret = sessionStorage.getItem('df_secret') || '';
+
+function adminFetch(action, extra) {
+  if (!_dfSecret) {
+    _dfSecret = prompt('Enter admin secret (ADMIN_SECRET env var):') || '';
+    if (!_dfSecret) return Promise.resolve(null);
+    sessionStorage.setItem('df_secret', _dfSecret);
+  }
+  return fetch('/api/admin', {
+    method: action === 'list' ? 'GET' : 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + _dfSecret },
+    body: action === 'list' ? undefined : JSON.stringify({ action, ...extra }),
+  }).then(r => {
+    if (r.status === 401) { _dfSecret = ''; sessionStorage.removeItem('df_secret'); return null; }
+    return r.json();
+  }).catch(() => null);
+}
+
+function openDomainFixes() {
+  document.getElementById('df-modal').style.display = 'block';
+  loadDomainFixes();
+}
+
+function closeDomainFixes() {
+  document.getElementById('df-modal').style.display = 'none';
+}
+
+function clearDfForm() {
+  ['df-hostname','df-primary','df-niche','df-categories','df-summary'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('df-form-msg').textContent = '';
+}
+
+function fillDfForm(fix) {
+  document.getElementById('df-hostname').value = fix.hostname || '';
+  document.getElementById('df-primary').value = fix.primary || '';
+  document.getElementById('df-niche').value = fix.niche || '';
+  document.getElementById('df-categories').value = (fix.categories || []).join(', ');
+  document.getElementById('df-summary').value = fix.summary || '';
+  document.getElementById('df-hostname').focus();
+}
+
+async function loadDomainFixes() {
+  document.getElementById('df-list').innerHTML = '<div style="color:rgba(238,242,255,.3);font-size:13px;text-align:center;padding:24px">Loading…</div>';
+  const data = await adminFetch('list');
+  if (!data) { document.getElementById('df-list').innerHTML = '<div style="color:#F87171;font-size:13px;padding:16px">Auth failed or server error. Check admin secret.</div>'; return; }
+  const fixes = data.fixes || [];
+  document.getElementById('df-count').textContent = fixes.length;
+  if (!fixes.length) { document.getElementById('df-list').innerHTML = '<div style="color:rgba(238,242,255,.3);font-size:13px;text-align:center;padding:24px">No fixes yet. Analyses auto-learn here over time.</div>'; return; }
+
+  document.getElementById('df-list').innerHTML = fixes.map((f, i) => {
+    const srcCol = f.source === 'admin' ? '#818CF8' : f.source === 'auto' ? '#34D399' : '#FBBF24';
+    const srcLbl = f.source === 'admin' ? 'Admin' : f.source === 'auto' ? 'Auto-learned' : 'Seed';
+    const date = f.updatedAt || f.learnedAt ? new Date(f.updatedAt || f.learnedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '';
+    return `<div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);margin-bottom:6px">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:#EEF2FF">${esc(f.hostname)}</span>
+          <span style="font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(99,102,241,.12);color:#818CF8">${esc(f.primary)}</span>
+          ${f.niche ? `<span style="font-size:10.5px;padding:2px 7px;border-radius:4px;background:rgba(34,211,238,.1);color:#22D3EE">${esc(f.niche)}</span>` : ''}
+          <span style="font-size:10.5px;padding:2px 7px;border-radius:4px;color:${srcCol};background:${srcCol}18">${srcLbl}</span>
+        </div>
+        ${f.summary ? `<div style="font-size:12px;color:rgba(238,242,255,.45);line-height:1.5;max-width:500px">${esc(f.summary.slice(0,120))}${f.summary.length>120?'…':''}</div>` : ''}
+        ${date ? `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(238,242,255,.25);margin-top:4px">${date}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-none">
+        <button onclick="fillDfForm(${JSON.stringify(JSON.stringify(f)).slice(1,-1).replace(/\\/g,'\\\\').replace(/'/g,"\\'")})"
+          data-idx="${i}" class="df-edit-btn" style="background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.2);border-radius:6px;padding:5px 11px;color:#818CF8;font-size:12px;cursor:pointer">Edit</button>
+        <button onclick="deleteDomainFix('${esc(f.hostname)}')" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.15);border-radius:6px;padding:5px 11px;color:#F87171;font-size:12px;cursor:pointer">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Wire edit buttons properly
+  document.querySelectorAll('.df-edit-btn').forEach((btn, i) => {
+    btn.onclick = () => fillDfForm(fixes[i]);
+  });
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function saveDomainFix() {
+  const hostname = document.getElementById('df-hostname').value.trim();
+  const primary = document.getElementById('df-primary').value.trim().toLowerCase();
+  const niche = document.getElementById('df-niche').value.trim();
+  const catRaw = document.getElementById('df-categories').value.trim();
+  const summary = document.getElementById('df-summary').value.trim();
+  const msg = document.getElementById('df-form-msg');
+  if (!hostname || !primary) { msg.style.color='#F87171'; msg.textContent='Hostname and primary category are required.'; return; }
+  const categories = catRaw ? catRaw.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean) : [primary];
+  if (!categories.includes(primary)) categories.unshift(primary);
+  msg.style.color='rgba(238,242,255,.4)'; msg.textContent='Saving…';
+  const btn = document.getElementById('df-save-btn');
+  btn.disabled = true;
+  const data = await adminFetch('set', { hostname, primary, categories, niche, summary });
+  btn.disabled = false;
+  if (data?.ok) {
+    msg.style.color='#34D399'; msg.textContent='Saved ✓';
+    clearDfForm();
+    loadDomainFixes();
+  } else {
+    msg.style.color='#F87171'; msg.textContent = data?.error || 'Save failed';
+  }
+}
+
+async function deleteDomainFix(hostname) {
+  if (!confirm('Delete fix for ' + hostname + '?')) return;
+  const data = await adminFetch('delete', { hostname });
+  if (data?.ok) loadDomainFixes();
+  else alert('Delete failed: ' + (data?.error || 'unknown error'));
+}
+
+// Close modal on backdrop click
+document.getElementById('df-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDomainFixes();
+});
 
 setStage('empty');
 renderList();

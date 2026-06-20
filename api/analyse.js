@@ -57,6 +57,7 @@ async function getStoredQuestions(category, niche, topicWords, needed, excludeSe
       if (topicSet.size) score += (item.topics || []).filter(t => topicSet.has(t)).length;
       return { ...item, score };
     })
+    .filter(item => item.score >= 10)  // require exact niche match — topic-word overlap alone causes cross-brand contamination
     .sort((a, b) => b.score - a.score)
     .slice(0, needed);
 
@@ -140,9 +141,31 @@ const DOMAIN_OVERRIDES = {
     summary: 'Holland & Barrett is a UK health and wellness retailer specialising in vitamins, supplements, natural health products and health foods.',
   },
   'johnlewis.com': {
-    primary: 'homeware',
+    primary: 'general-retail',
     categories: ['homeware', 'fashion', 'electronics', 'general-retail'],
-    summary: 'John Lewis is a UK department store and online retailer selling homeware, electricals, fashion, nursery and gifting products.',
+    summary: 'John Lewis & Partners is a leading UK department store selling homeware, electricals, fashion, baby products and gifts online and in-store.',
+  },
+  'dominos.co.uk': {
+    primary: 'food',
+    categories: ['food', 'local-services'],
+    niche: 'pizza delivery chain',
+    summary: 'Domino\'s Pizza is the UK\'s leading pizza delivery brand with thousands of stores nationwide offering online ordering, delivery and collection.',
+  },
+  'pizzahut.co.uk': {
+    primary: 'food',
+    categories: ['food', 'local-services'],
+    niche: 'pizza delivery',
+    summary: 'Pizza Hut is one of the UK\'s largest pizza restaurant and delivery chains, offering dine-in, collection and delivery of pizzas, sides, pasta and desserts. Known for its buffet restaurants, delivery service and variety of pizza toppings.',
+  },
+  'babyliss.co.uk': {
+    primary: 'beauty',
+    categories: ['beauty', 'electronics'],
+    summary: 'BaByliss is a professional hair care and styling brand selling hair dryers, straighteners, curlers and grooming tools.',
+  },
+  'peloton.com': {
+    primary: 'fitness',
+    categories: ['fitness', 'electronics'],
+    summary: 'Peloton is a home fitness brand offering connected exercise bikes, treadmills and digital fitness classes.',
   },
 };
 
@@ -279,6 +302,18 @@ const CATEGORY_DEFS = {
       'next day delivery', 'gift card', 'wishlist', 'order tracking',
     ],
   },
+  'gifts-occasions': {
+    label: 'Gifts & occasions',
+    keywords: [
+      'flowers', 'flower', 'bouquet', 'bouquets', 'floristry', 'florist', 'floral',
+      'gift delivery', 'gift box', 'gift set', 'hamper', 'letterbox gift', 'send flowers',
+      'wedding flowers', 'birthday flowers', 'sympathy flowers', 'funeral flowers',
+      'anniversary gift', 'personalised gift', 'bespoke gift', 'subscription flowers',
+      'flower subscription', 'plant gift', 'dried flowers', 'artificial flowers',
+      'chocolate gift', 'chocolate box', 'greeting card', 'gift wrapping', 'occasion',
+      'celebration', 'same day delivery flowers',
+    ],
+  },
 };
 
 // Reverse map: Gemini label â†' internal key
@@ -305,6 +340,10 @@ const LABEL_ALIASES = {
   'general retail': 'general-retail',
   'general retail / department store': 'general-retail',
   'department store': 'general-retail',
+  'gifts & occasions': 'gifts-occasions',
+  'gifts and occasions': 'gifts-occasions',
+  'gift & occasions': 'gifts-occasions',
+  'flowers & gifts': 'gifts-occasions',
   'other': 'other',
 };
 
@@ -342,10 +381,21 @@ const QUESTIONS = {
     'best scented candle for living rooms',
   ],
   food: [
-    'best specialty coffee subscription UK',
-    'best artisan chocolate brand UK',
-    'best craft gin UK 2025',
-    'best organic pasta sauce UK',
+    'best food delivery service in the UK',
+    'best takeaway for a family dinner',
+    'where can I order food online for delivery tonight',
+    'best meal delivery box UK',
+    'best restaurant for a birthday dinner',
+    'where can I get a good takeaway near me',
+    'best food gift for someone who loves food',
+    'best online food ordering platform UK',
+    'good food options for a large group',
+    'best food delivery for a date night',
+    'where to order food for a party',
+    'best food subscription box UK',
+    'good food options for vegetarians',
+    'best delivery app for late night food',
+    'where can I get healthy food delivered to my door',
   ],
   supplements: [
     'best collagen supplement for skin UK',
@@ -423,6 +473,28 @@ const CUSTOMER_TYPES = {
 
 // â”€â”€ HTTP fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Extract a clean brand name from a hostname: "seasaltcornwall.com" → "Seasalt Cornwall"
+const TLD_MARKET_MAP = [
+  ['co.uk', 'UK'], ['org.uk', 'UK'], ['me.uk', 'UK'], ['.uk', 'UK'],
+  ['com.au', 'Australia'], ['net.au', 'Australia'], ['org.au', 'Australia'],
+  ['co.nz', 'New Zealand'], ['.nz', 'New Zealand'],
+  ['.ie', 'Ireland'], ['.ca', 'Canada'], ['.de', 'Germany'], ['.fr', 'France'],
+  ['.es', 'Spain'], ['.it', 'Italy'], ['.nl', 'Netherlands'], ['.se', 'Sweden'],
+  ['.no', 'Norway'], ['.dk', 'Denmark'], ['.fi', 'Finland'], ['.be', 'Belgium'],
+  ['.ch', 'Switzerland'], ['.at', 'Austria'], ['.pl', 'Poland'], ['.pt', 'Portugal'],
+  ['.in', 'India'], ['.sg', 'Singapore'], ['.za', 'South Africa'], ['.ae', 'UAE'],
+];
+
+function detectMarketFromUrl(url) {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    for (const [tld, market] of TLD_MARKET_MAP) {
+      const suffix = tld.startsWith('.') ? tld : '.' + tld;
+      if (hostname === suffix.slice(1) || hostname.endsWith(suffix)) return market;
+    }
+  } catch {}
+  return null;
+}
+
 function brandFromHostname(hostname) {
   const h = hostname.replace(/^www\./, '').replace(/\.(co\.uk|com\.au|org\.uk|com|org|net|co|uk|io|store|shop)$/i, '');
   // Split on hyphens/underscores, then try to split concatenated words via common patterns
@@ -458,42 +530,47 @@ async function fetchDDGInstant(query) {
 
 // Wikipedia REST API — free, no API key, no bot detection
 async function fetchWikipedia(brandName) {
-  try {
-    // First search for the brand to find the right article title
-    const searchQ = encodeURIComponent(brandName);
-    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchQ}&srlimit=3&format=json&origin=*`;
-    const searchData = await new Promise((resolve, reject) => {
-      https.get(searchUrl, { headers: { 'User-Agent': 'Visible-brand-research/1.0' } }, (res) => {
+  function wikiGet(url) {
+    return new Promise((resolve, reject) => {
+      https.get(url, { headers: { 'User-Agent': 'Visible-brand-research/1.0' } }, (res) => {
         let raw = '';
         res.setEncoding('utf8');
         res.on('data', c => { raw += c; });
         res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve(null); } });
       }).setTimeout(6000, function() { this.destroy(); reject(new Error('timeout')); }).on('error', reject);
     });
+  }
 
+  try {
+    const brandWords = brandName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+    // Single search call — return top 5 results and pick the best title match
+    const searchQ = encodeURIComponent(brandName);
+    const searchData = await wikiGet(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchQ}&srlimit=5&format=json`);
     const hits = searchData?.query?.search || [];
     if (!hits.length) return null;
 
-    // Use the top hit that looks like a brand/company match
-    const brandLower = brandName.toLowerCase();
-    const hit = hits.find(h => h.title.toLowerCase().includes(brandLower.split(' ')[0])) || hits[0];
-    if (!hit) return null;
+    // Score hits by how many brand words appear in the title
+    const scored = hits.map(h => {
+      const titleL = h.title.toLowerCase();
+      const score = brandWords.filter(w => titleL.includes(w)).length;
+      return { ...h, score };
+    }).sort((a, b) => b.score - a.score);
 
-    // Fetch the page summary
+    const hit = scored[0];
+    if (!hit || hit.score === 0) return null; // No title matches any brand word
+
+    // Fetch summary for the best hit
     const titleEnc = encodeURIComponent(hit.title);
-    const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${titleEnc}`;
-    const summaryData = await new Promise((resolve, reject) => {
-      https.get(summaryUrl, { headers: { 'User-Agent': 'Visible-brand-research/1.0' } }, (res) => {
-        let raw = '';
-        res.setEncoding('utf8');
-        res.on('data', c => { raw += c; });
-        res.on('end', () => { try { resolve(JSON.parse(raw)); } catch { resolve(null); } });
-      }).setTimeout(6000, function() { this.destroy(); reject(new Error('timeout')); }).on('error', reject);
-    });
-
+    const summaryData = await wikiGet(`https://en.wikipedia.org/api/rest_v1/page/summary/${titleEnc}`);
     if (!summaryData || summaryData.type === 'disambiguation') return null;
+
     const extract = (summaryData.extract || '').slice(0, 600).trim();
     if (!extract) return null;
+
+    // Reject if extract doesn't mention any brand word (wrong article)
+    const extractL = extract.toLowerCase();
+    if (!brandWords.some(w => extractL.includes(w))) return null;
 
     return {
       snippets: [extract],
@@ -676,7 +753,7 @@ function postJson(url, payload, timeout = 12000, extraHeaders = {}) {
   });
 }
 
-function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLocation) {
+function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLocation, market) {
   const ddgBlock = ddgSignal ? [
     ddgSignal.heading  ? `Brand: ${ddgSignal.heading}` : '',
     ddgSignal.entity   ? `Entity type: ${ddgSignal.entity}` : '',
@@ -690,8 +767,8 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLoca
   ].filter(Boolean).join('\n') : '';
 
   const signalsBlock = ddgBlock
-    ? `URL: ${targetUrl}\n\n${ddgBlock}`
-    : `URL: ${targetUrl}\nNo external data found — use your training knowledge about this brand.`;
+    ? `URL: ${targetUrl}\n\nExternal research signals:\n${ddgBlock}`
+    : `URL: ${targetUrl}\nNo external reference data found — rely on your training knowledge about this brand and URL.`;
 
   const locationHint = userLocation
     ? `\nUser location: ${[userLocation.town, userLocation.county, userLocation.country].filter(Boolean).join(', ')}`
@@ -705,7 +782,7 @@ function buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLoca
   “business_summary”: “2-3 sentences in your own words”,
   “primary_category”: “one exact value from the category list”,
   “secondary_categories”: [],
-  “detected_niche”: “specific sub-type e.g. nut butter brand — empty if none”,
+  “detected_niche”: “specific sub-type based on WHAT the business SELLS (not the brand name's cultural origin) — e.g. 'craft chocolate brand', 'subscription flower delivery', 'artisan coffee roaster' — empty if none”,
   “products_or_services_found”: [{“category”: “label”, “examples”: [“product 1”, “product 2”]}],
   “customer_channels”: [{“channel”: “e.g. Direct ecommerce / Supermarket retail”, “reason”: “one sentence”}],
   “public_signals”: [“award”, “heritage”, “location”, “years trading”],
@@ -733,9 +810,10 @@ RULES:
 4. Do NOT write questions about categories not relevant to this brand.
 5. Generate AT LEAST 12 questions covering DIFFERENT angles — no two questions should have the same core intent.
    Required spread: discovery(3+), specific_product(3+), comparison(2+), occasion(1+), gift(1+), awareness(1+), location(1+).
-   DIVERSITY RULE: Each question must ask about a genuinely different product, use-case, or audience. Do NOT generate variations like “best X for Y” and “top X for Y” — they count as one question.${userLocation ? `
+   DIVERSITY RULE: Each question must ask about a genuinely different product, use-case, or audience. Do NOT generate variations like “best X for Y” and “top X for Y” — they count as one question.${market ? `
+   MARKET RULE: This brand operates in the ${market} market. ALL questions must be relevant to ${market} consumers. Where it sounds natural, include “${market}” in the question — e.g. “best pizza delivery in the UK”, “where to buy X online in the UK”. Generic phrasing like “near me” is fine too but at least half the questions should explicitly mention ${market}.` : ''}${userLocation ? `
    LOCATION RULE: Include at least 3 location questions using “${[userLocation.town, userLocation.county].filter(Boolean).join('” or “')}” as the named place. Examples: “best [service] in ${userLocation.town}”, “where can I find [product] near ${userLocation.town}”, “[service] near ${userLocation.town} recommendations”.` : ''}
-6. visibility_gaps: name actual product types, page types, or information a buyer would want. Not “add more content” — say “no page for allergen information” or “no UK stockist map”.
+6. visibility_gaps: name actual product types, page types, or information a buyer would want. Be specific to THIS brand — e.g. “no dedicated page for [specific product range]”, “no FAQ answering [common buyer question for this category]”, “no size/fit guide for [garment type]”. Do NOT copy generic examples.
    Base your gaps on the AI optimisation principles below — e.g. missing FAQ content, thin product descriptions, no schema markup signals, no Google Business Profile signals, no stockist/availability page.
 
 REFERENCE — Google AI Optimisation Guide (use this to inform visibility_gaps):
@@ -751,7 +829,9 @@ prompt_type definitions:
 - awareness: “who sells X”, “where can I buy X online”, “where does X ship”
 - trade: only if clear B2B signals exist
 
-Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | General retail / department store | Other
+Categories: Fashion & apparel | Beauty & skincare | Homeware & décor | Food & drink | Grocery & supermarket | Supplements & wellness | Pet products | Fitness & sports | Baby & kids | Electronics & accessories | Professional services | Local services | Gifts & occasions | General retail / department store | Other
+
+CATEGORY GUIDANCE: "Gifts & occasions" = flower delivery, gift box services, hampers, floristry, personalised gifts, gift subscriptions. "Food & drink" = food/drink product brands (chocolate, coffee, beer, etc.) — NOT gift wrapping. Use "Food & drink" for Montezuma's Chocolates, Hotel Chocolat, Biscuiteers etc. even if they also sell gifts.
 
 Brand signals:
 ${signalsBlock}${locationHint}`;
@@ -771,7 +851,7 @@ async function callGemini(prompt) {
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 28000);
+      const timer = setTimeout(() => controller.abort(), 18000);
       let res, body;
       try {
         res = await fetch(endpoint, {
@@ -814,7 +894,7 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, t
       { role: 'user', content: prompt },
     ],
     temperature: 0.2,
-    max_tokens: 2500,
+    max_tokens: 3500,
   };
   try {
     const result = await postJson(endpoint, payload, timeout, { Authorization: `Bearer ${apiKey}` });
@@ -840,11 +920,17 @@ async function callOpenAICompat(endpoint, model, apiKey, prompt, providerName, t
   }
 }
 
-function callGroq(prompt) {
+async function callGroq(prompt) {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return Promise.resolve(null);
-  // llama-3.1-8b-instant: 6000 RPM free tier (vs 30 RPM for 70b)
-  return callOpenAICompat('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', apiKey, prompt, 'Groq', 25000);
+  if (!apiKey) return null;
+  const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+  // Try 70b first (better JSON quality), fall back to 8b-instant (6000 RPM) if rate-limited
+  const result70b = await callOpenAICompat(endpoint, 'llama-3.3-70b-versatile', apiKey, prompt, 'Groq70b', 20000);
+  // Fall back to 8b-instant (6000 RPM) on ANY error: 429, timeout, bad JSON, etc.
+  if (!result70b || result70b._error) {
+    return callOpenAICompat(endpoint, 'llama-3.1-8b-instant', apiKey, prompt, 'Groq8b', 15000);
+  }
+  return result70b;
 }
 
 // OpenRouter — works from Vercel, free tier (200 RPD), no credit card required
@@ -853,14 +939,14 @@ async function callOpenRouter(prompt) {
   if (!apiKey) return null;
   const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
   const models = [
-    'meta-llama/llama-3.1-8b-instruct:free',
-    'google/gemma-3-12b-it:free',
-    'mistralai/mistral-7b-instruct:free',
-    'qwen/qwen2.5-7b-instruct:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'google/gemma-4-31b-it:free',
+    'qwen/qwen3-next-80b-a3b-instruct:free',
+    'nousresearch/hermes-3-llama-3.1-405b:free',
   ];
   let lastErr;
   for (const model of models) {
-    const result = await callOpenAICompat(endpoint, model, apiKey, prompt, `OpenRouter(${model})`, 20000);
+    const result = await callOpenAICompat(endpoint, model, apiKey, prompt, `OpenRouter(${model})`, 15000);
     if (result && !result._error) return result;
     lastErr = result;
     const errStr = result?._error || '';
@@ -871,7 +957,7 @@ async function callOpenRouter(prompt) {
 }
 
 // ── Top-up: stored questions first, then AI if still short ───────────────────
-async function topUpQuestions(aiResult, existingQs, brandPhrases, primaryKey, needed) {
+async function topUpQuestions(aiResult, existingQs, brandPhrases, primaryKey, needed, market) {
   const topicWords = (aiResult.allowed_topics || []).flatMap(t => t.toLowerCase().split(/[\s,&\/]+/)).filter(w => w.length > 2);
   const niche = (aiResult.detected_niche || '').toLowerCase();
   const existingSet = new Set(existingQs.map(q => q.question.toLowerCase()));
@@ -904,7 +990,7 @@ Category: ${category}${niche ? `\nNiche: ${niche}` : ''}
 Products / services: ${products || 'see category'}
 Topics: ${topics}
 
-Generate exactly ${stillNeeded} questions. Casual, natural, plain English.
+Generate exactly ${stillNeeded} questions. Casual, natural, plain English.${market ? ` All questions must target the ${market} market — mention "${market}" in at least half of them.` : ''}
 
 RULES:
 - Do NOT name any specific brand or company
@@ -937,7 +1023,7 @@ Return ONLY a valid JSON array of strings:
         if (r.status === 200) return r.body?.choices?.[0]?.message?.content || '';
       }
       if (which === 'openrouter' && process.env.OPENROUTER_API_KEY) {
-        for (const model of ['meta-llama/llama-3.1-8b-instruct:free', 'qwen/qwen3-8b:free', 'mistralai/mistral-7b-instruct:free']) {
+        for (const model of ['meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-4-31b-it:free']) {
           const r = await postJson('https://openrouter.ai/api/v1/chat/completions',
             { ...body, model }, 18000,
             { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` });
@@ -998,23 +1084,25 @@ function categorizeDDG(ddgSignal, targetUrl, brandNameHint) {
 }
 
 // â”€â”€ AI orchestrator: Gemini â†' OpenRouter â†' Groq â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function callAI(extracted, targetUrl, analysisStatus, ddgSignal, userLocation) {
-  const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLocation);
+async function callAI(extracted, targetUrl, analysisStatus, ddgSignal, userLocation, market) {
+  const prompt = buildAiPrompt(extracted, targetUrl, analysisStatus, ddgSignal, userLocation, market);
 
-  // Groq primary — 6000 RPM free tier with 8b-instant model
-  const groqResult = await callGroq(prompt);
-  if (groqResult && !groqResult._error) return groqResult;
+  // Fire all providers simultaneously — first success wins
+  const results = await Promise.allSettled([
+    callGroq(prompt),
+    callGemini(prompt),
+    callOpenRouter(prompt),
+  ]);
 
-  // Gemini fallback
-  const geminiResult = await callGemini(prompt);
-  if (geminiResult && !geminiResult._error) return geminiResult;
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value && !r.value._error) return r.value;
+  }
 
-  // OpenRouter last resort
-  const openRouterResult = await callOpenRouter(prompt);
-  if (openRouterResult && !openRouterResult._error) return openRouterResult;
-
-  const lastErr = openRouterResult || geminiResult || groqResult || { _error: 'no_ai_provider' };
-  return { ...lastErr, _allErrors: { groq: groqResult?._error || 'null', gemini: geminiResult?._error || 'null', openrouter: openRouterResult?._error || 'null' } };
+  const [groq, gemini, openrouter] = results.map(r =>
+    r.status === 'fulfilled' ? (r.value?._error || 'unknown') : (r.reason?.message || 'rejected')
+  );
+  console.error('All AI providers failed:', { groq, gemini, openrouter });
+  return { _error: 'all_providers_failed', _allErrors: { groq, gemini, openrouter } };
 }
 
 // â”€â”€ Niche question templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1124,6 +1212,30 @@ const NICHE_QUESTIONS = {
     'where can I order traditional British ales online?',
     'can you recommend a brewery in the South West that does tours?',
   ],
+  'pizza delivery': [
+    'best pizza delivery in the UK',
+    'where can I order pizza for delivery tonight',
+    'best pizza for a family takeaway night',
+    'best pizza deal for a large group',
+    'best vegan pizza delivery option',
+    'best gluten-free pizza delivery',
+    'where to get pizza delivered quickly near me',
+    'what toppings are most popular on a pizza',
+    'best pizza for a kids birthday party',
+    'cheapest pizza delivery with good quality',
+    'best pizza sides to order with a takeaway',
+    'best pizza for a movie night',
+    'where can I order pizza for a corporate lunch',
+    'best pizza place for a late night delivery',
+    'is there a pizza delivery loyalty scheme worth signing up to',
+  ],
+  'pizza restaurant': [
+    'best pizza restaurant for a date night',
+    'best family-friendly pizza restaurant UK',
+    'best pizza buffet restaurant UK',
+    'best pizza restaurant for a group booking',
+    'best pizza chain in the UK',
+  ],
 };
 
 // Exclusive terms per category â€” words that signal a question belongs to THAT category only.
@@ -1142,6 +1254,7 @@ const EXCLUSIVE_TERMS = {
   'professional-services': ['accountant', 'solicitor', 'marketing agency', 'it support', 'hr software'],
   'local-services':     ['near me', 'plumber', 'electrician', 'salon', 'barber', 'dentist', 'cleaner'],
   'general-retail':     ['department store', 'next day delivery', 'gift card', 'order tracking'],
+  'gifts-occasions':    ['bouquet', 'floristry', 'florist', 'send flowers', 'flower delivery', 'letterbox flowers', 'hamper', 'subscription flowers'],
 };
 
 // Returns true if the question text contains terms exclusive to a DIFFERENT category
@@ -1328,7 +1441,7 @@ function buildRiskNarrative(brandName, primary, categories) {
   const catLabel = CATEGORY_DEFS[primary]?.label || primary;
   const others = categories.filter(c => c !== primary).map(c => CATEGORY_DEFS[c]?.label || c);
   const multi = others.length > 0 ? ` (and ${others.join(', ')})` : '';
-  return `When shoppers ask AI assistants for ${catLabel}${multi} recommendations, they typically receive 3â€“5 brand names. Based on ${name}'s public website signals, we've identified the question types where visibility gaps are most likely. The full report shows which queries are relevant to your brand and which competitors are appearing instead.`;
+  return `When shoppers ask AI assistants for ${catLabel}${multi} recommendations, they typically receive 3-5 brand names. Based on ${name}'s public website signals, we've identified the question types where visibility gaps are most likely. The full report shows which queries are relevant to your brand and which competitors are appearing instead.`;
 }
 
 // Detect niche from raw text signals without AI
@@ -1339,6 +1452,7 @@ const NICHE_KEYWORDS = [
   { niche: 'speciality coffee', terms: ['speciality coffee', 'specialty coffee', 'single origin', 'coffee roaster', 'espresso'] },
   { niche: 'craft gin', terms: ['craft gin', 'gin distillery', 'small batch gin', 'botanical gin'] },
   { niche: 'artisan chocolate', terms: ['bean to bar', 'artisan chocolate', 'craft chocolate', 'cacao'] },
+  { niche: 'pizza delivery', terms: ['pizza delivery', 'pizza takeaway', 'order pizza', 'pizza hut', 'domino', 'pizza restaurant', 'pizza chain'] },
 ];
 
 function detectNicheFromText(extracted) {
@@ -1366,12 +1480,60 @@ function buildQuestions(categories, niche) {
 }
 
 // â”€â”€ Domain override matcher â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function matchDomainOverride(rawUrl) {
+// Sync fallback — hardcoded seed only (used on cached result path where we can't await)
+function matchDomainOverrideSync(rawUrl) {
   try {
     const hostname = new URL(rawUrl.startsWith('http') ? rawUrl : 'https://' + rawUrl)
       .hostname.replace(/^www\./, '');
     return DOMAIN_OVERRIDES[hostname] || null;
   } catch { return null; }
+}
+
+// Async — checks KV first (runtime), falls back to hardcoded seed
+async function getDomainFix(rawUrl) {
+  try {
+    const hostname = new URL(rawUrl.startsWith('http') ? rawUrl : 'https://' + rawUrl)
+      .hostname.replace(/^www\./, '');
+    // 1. KV runtime fix (set by admin or auto-learned)
+    const kvRaw = await kvCmd('GET', `domainfix:${hostname}`);
+    if (kvRaw) {
+      try {
+        const fix = JSON.parse(kvRaw);
+        console.log(`Domain fix from KV (${fix.source || 'unknown'}): ${hostname}`);
+        return fix;
+      } catch {}
+    }
+    // 2. Hardcoded seed fallback
+    return DOMAIN_OVERRIDES[hostname] || null;
+  } catch { return null; }
+}
+
+// Auto-learn: write a successful analysis result back to KV so future runs skip re-analysis.
+// Only writes if no admin fix already exists for this domain.
+async function autoLearnDomainFix(rawHostname, { primary, categories, niche, summary }) {
+  const hostname = (rawHostname || '').replace(/^www\./, '');
+  if (!hostname || !primary) return;
+  try {
+    const existing = await kvCmd('GET', `domainfix:${hostname}`);
+    if (existing) {
+      const parsed = JSON.parse(existing);
+      // Never overwrite an admin-set fix
+      if (parsed.source === 'admin') return;
+    }
+    const fix = {
+      primary,
+      categories: categories || [primary],
+      niche: niche || '',
+      summary: summary || '',
+      source: 'auto',
+      learnedAt: new Date().toISOString(),
+    };
+    await kvCmd('SET', `domainfix:${hostname}`, JSON.stringify(fix));
+    await kvCmd('SADD', 'domainfix:index', hostname);
+    console.log(`Auto-learned domain fix for ${hostname}: ${primary}${niche ? ' / ' + niche : ''}`);
+  } catch (e) {
+    console.warn('autoLearnDomainFix error:', e.message);
+  }
 }
 
 function readBody(req) {
@@ -1421,7 +1583,8 @@ function dedupQuestions(qs) {
 // Persists across warm invocations of the same serverless instance.
 // Prevents repeated Gemini calls for the same URL within a warm window.
 const RESULT_CACHE = new Map();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour in-memory TTL
+const KV_RESULT_TTL = 86400; // 24h in KV
 
 function cacheGet(key) {
   const entry = RESULT_CACHE.get(key);
@@ -1432,9 +1595,25 @@ function cacheGet(key) {
 
 function cacheSet(key, data) {
   if (RESULT_CACHE.size >= 50) {
-    RESULT_CACHE.delete(RESULT_CACHE.keys().next().value); // evict oldest
+    RESULT_CACHE.delete(RESULT_CACHE.keys().next().value);
   }
   RESULT_CACHE.set(key, { data, ts: Date.now() });
+}
+
+async function kvResultGet(key) {
+  if (!KV_URL) return null;
+  try {
+    const r = await kvCmd('GET', `result:${key}`);
+    if (!r) return null;
+    return typeof r === 'object' ? r : JSON.parse(r);
+  } catch { return null; }
+}
+
+async function kvResultSet(key, data) {
+  if (!KV_URL) return;
+  try {
+    await kvCmd('SET', `result:${key}`, JSON.stringify(data), 'EX', KV_RESULT_TTL);
+  } catch { /* ignore */ }
 }
 
 // â”€â”€ Handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1446,17 +1625,32 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const body = await readBody(req);
-  let { url: targetUrl, brandName = '', market = 'UK', manualCategory, userLocation } = body;
+  let { url: targetUrl, brandName = '', market, manualCategory, userLocation, bustCache = false } = body;
   // userLocation: { town, county, country } — optional, from browser geolocation
   if (!targetUrl) return res.status(400).json({ error: 'url is required' });
   if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
+  // Auto-detect market from TLD; body.market can override, null means global/generic
+  if (!market) market = detectMarketFromUrl(targetUrl);
 
-  // Return cached result if available (avoids redundant Gemini calls)
+  // Return cached result (in-memory first, then KV for cross-instance persistence)
   const cacheKey = targetUrl.toLowerCase().replace(/\/+$/, '');
+  if (!bustCache) {
   const cached = cacheGet(cacheKey);
   if (cached) {
-    console.log(`Cache hit: ${cacheKey}`);
+    console.log(`Cache hit (memory): ${cacheKey}`);
     return res.status(200).json({ ...cached, _cached: true });
+  }
+  }
+  const kvCached = bustCache ? null : await kvResultGet(cacheKey);
+  if (kvCached) {
+    cacheSet(cacheKey, kvCached); // warm in-memory cache
+    console.log(`Cache hit (KV): ${cacheKey}`);
+    // Apply domain override even on cached results (in case category was wrong when first cached)
+    const cachedOverride = matchDomainOverrideSync(cacheKey);
+    const cachedResult = cachedOverride?.primary && kvCached.primary !== cachedOverride.primary
+      ? { ...kvCached, primary: cachedOverride.primary, categories: (cachedOverride.categories || [cachedOverride.primary]).map(k => ({ key: k, label: CATEGORY_DEFS[k]?.label || k, primary: k === cachedOverride.primary })) }
+      : kvCached;
+    return res.status(200).json({ ...cachedResult, _cached: true });
   }
 
   // Manual category override (from fallback UI)
@@ -1480,26 +1674,41 @@ module.exports = async (req, res) => {
     });
   }
 
-  // Domain override
-  const override = matchDomainOverride(targetUrl);
+  // Domain fix — check KV runtime store first, fall back to hardcoded seed
+  const override = await getDomainFix(targetUrl);
 
   const extracted = { title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' };
   const fetchedOk = false;
   const analysisStatus = 'ok';
 
   // Multi-signal brand research — DDG Instant Answers + Wikipedia (parallel)
-  const hostname = (() => { try { return new URL(targetUrl).hostname; } catch { return ''; } })();
+  const hostname = (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, ''); } catch { return ''; } })();
   const brandGuess = brandName || brandFromHostname(hostname);
-  const [ddgInstant, ddgInstant2, wikiData] = await Promise.all([
-    fetchDDGInstant(brandGuess),
-    fetchDDGInstant(brandGuess + ' brand UK'),
-    fetchWikipedia(brandGuess),
-  ]);
-  const instantBest = ddgInstant?.abstract ? ddgInstant : (ddgInstant2?.abstract ? ddgInstant2 : null);
-  const ddgSignal = mergeDDGSignals(instantBest, wikiData, brandGuess);
+
+  // When a domain override has a definitive summary, skip DDG entirely to prevent
+  // disambiguation (e.g. "dominos" → Eric Clapton band) from poisoning AI context.
+  let ddgSignal;
+  if (override?.summary) {
+    extracted.metaDesc = override.summary;
+    ddgSignal = { abstract: override.summary, heading: brandGuess, topics: [], infobox: [] };
+    console.log(`Domain override DDG bypass for ${hostname}`);
+  } else {
+    // Fire up to 4 parallel lookups to maximise brand context
+    const [ddgInstant, ddgInstant2, wikiData, wikiData2] = await Promise.all([
+      fetchDDGInstant(brandGuess),
+      fetchDDGInstant(brandGuess + ' brand'),
+      fetchWikipedia(brandGuess),
+      fetchWikipedia(brandGuess + ' brand'),
+    ]);
+    const instantBest = [ddgInstant, ddgInstant2].find(d => d?.abstract) || null;
+    // Prefer the Wikipedia result whose extract actually mentions the brand name
+    const brandLower = brandGuess.toLowerCase();
+    const wikiPick = [wikiData, wikiData2].find(w => w?.snippets?.[0]?.toLowerCase().includes(brandLower.split(' ')[0])) || wikiData || wikiData2;
+    ddgSignal = mergeDDGSignals(instantBest, wikiPick, brandGuess);
+  }
 
   // AI generates brand-specific questions using DDG data as context
-  const aiRaw = await callAI({ title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' }, targetUrl, 'ok', ddgSignal, userLocation);
+  const aiRaw = await callAI({ title: '', metaDesc: '', ogTitle: '', ogDesc: '', headings: [], navLinks: [], bodyText: '' }, targetUrl, 'ok', ddgSignal, userLocation, market);
   const ai = aiRaw && !aiRaw._error ? aiRaw : null;
 
   let responseData;
@@ -1512,6 +1721,19 @@ module.exports = async (req, res) => {
       detectedNiche, productsFound, productsStructured,
       customerChannels, publicSignals, visibilityGaps, locationSignals } = mapped;
 
+    // Domain override wins over AI category if AI got it wrong
+    if (override?.primary && primary !== override.primary) {
+      console.log(`Domain override: ${primary} → ${override.primary}`);
+      primary = override.primary;
+      categories = override.categories || [primary];
+      // Also patch the raw AI object so topUpQuestions uses the correct category
+      ai.primary_category = CATEGORY_DEFS[primary]?.label || primary;
+    }
+    // Domain override niche wins if AI niche is wrong (e.g. DDG disambiguation)
+    if (override?.niche && detectedNiche !== override.niche) {
+      detectedNiche = override.niche;
+    }
+
     questionsRich = dedupQuestions(questionsRich);
     questions = questionsRich.map(q => q.question);
 
@@ -1520,11 +1742,45 @@ module.exports = async (req, res) => {
       const brandPhrases = [organisationName, aiBrand, brandName]
         .map(s => (s || '').toLowerCase().trim()).filter(s => s.length > 3);
       const needed = MIN_QUESTIONS - questionsRich.length;
-      const extra = await topUpQuestions(ai, questionsRich, brandPhrases, primary, needed + 3);
-      const combined = [...questionsRich, ...extra.slice(0, needed)];
-      questionsRich = combined;
-      questions = combined.map(q => q.question);
-      weakEvidence = combined.length < 3;
+      const extra = await topUpQuestions(ai, questionsRich, brandPhrases, primary, needed + 3, market);
+      questionsRich = dedupQuestions([...questionsRich, ...extra]);
+    }
+
+    // Guaranteed template fallback — if KV store + AI topUp both failed, ensure at least 12 questions
+    const TEMPLATE_FLOOR = 12;
+    if (questionsRich.length < TEMPLATE_FLOOR) {
+      const nicheForTemplate = detectedNiche.toLowerCase();
+      // Fuzzy match: find the NICHE_QUESTIONS key whose words overlap most with the detected niche
+      const nicheKeys = Object.keys(NICHE_QUESTIONS);
+      const matchedKey = nicheKeys.find(k => nicheForTemplate.includes(k)) ||
+        nicheKeys.find(k => k.split(' ').some(w => w.length > 4 && nicheForTemplate.includes(w)));
+      const templateQs = buildQuestions(categories, matchedKey || nicheForTemplate);
+      const existingLower = new Set(questionsRich.map(q => q.question.toLowerCase()));
+      const templateExtras = templateQs
+        .filter(q => !existingLower.has(q.toLowerCase()))
+        .slice(0, TEMPLATE_FLOOR - questionsRich.length)
+        .map(q => {
+          // Append market suffix to template questions that don't already mention the market
+          const qFinal = (market && !q.toLowerCase().includes(market.toLowerCase()))
+            ? q.replace(/[?]$/, '') + ' in the ' + market + '?'
+            : q;
+          return { question: qFinal, search_intent: '', evidence_term: '', prompt_type: 'discovery' };
+        });
+      questionsRich = [...questionsRich, ...templateExtras];
+    }
+
+    questions = questionsRich.map(q => q.question);
+    weakEvidence = questionsRich.length < 3;
+
+    // Auto-learn: persist successful results to KV so future analyses use this fix without redeploying.
+    // Awaited before response so Vercel doesn't kill it — it's a fast KV write.
+    if (!weakEvidence && questions.length >= 12 && !override?.source) {
+      await autoLearnDomainFix(hostname, {
+        primary,
+        categories,
+        niche: detectedNiche || '',
+        summary: summary || ddgSignal?.abstract || '',
+      });
     }
 
     const displayTitle = organisationName || aiBrand || brandName || targetUrl;
@@ -1537,7 +1793,7 @@ module.exports = async (req, res) => {
       fetchedOk: false, needsManualCategory: false, analysis_status: 'ok',
       aiAssisted: true, manual: false,
       title: displayTitle, organisationName: organisationName || null, summary,
-      primary, niche: detectedNiche || null,
+      primary, niche: detectedNiche || null, market: market || null,
       productsFound, productsStructured, customerChannels, publicSignals, visibilityGaps,
       locationSignals: locationSignals || null,
       categories: categoryLabels, customerType,
@@ -1546,14 +1802,16 @@ module.exports = async (req, res) => {
       ddgSummary: ddgSignal?.abstract || ddgSignal?.searchSnippets?.[0] || null,
       ddgTopics: ddgSignal?.topics || [],
       ddgInfobox: ddgSignal?.infobox || [],
-      _ddgSnippets: ddgSignal?.searchSnippets || [],
+
       brandAuditQuestions: buildBrandAuditQuestions(displayTitle, detectedNiche, CATEGORY_DEFS[primary]?.label),
     };
 
   } else {
     // AI failed — fall back to DDG keyword categorization + template questions (no manual category screen)
     console.warn('AI failed, falling back to DDG categorization:', aiRaw?._error);
-    const { primary, categories, weak: weakEvidence } = categorizeDDG(ddgSignal, targetUrl, brandName);
+    let { primary, categories, weak: weakEvidence } = categorizeDDG(ddgSignal, targetUrl, brandName);
+    // Domain override wins over keyword fallback
+    if (override?.primary) { primary = override.primary; categories = override.categories || [primary]; weakEvidence = false; }
     const displayTitle = ddgSignal?.heading || brandName || new URL(targetUrl).hostname.replace(/^www\./, '');
     const summary = ddgSignal?.abstract || `Visibility preview for ${displayTitle} based on category signals.`;
     const rawQuestions = buildQuestions(categories);
@@ -1578,7 +1836,10 @@ module.exports = async (req, res) => {
     };
   }
 
-  if (!responseData.weakEvidence) cacheSet(cacheKey, responseData);
+  if (responseData.aiAssisted && !responseData.weakEvidence) {
+    cacheSet(cacheKey, responseData);
+    kvResultSet(cacheKey, responseData); // persist cross-instance for 24h
+  }
 
   res.status(200).json(responseData);
 

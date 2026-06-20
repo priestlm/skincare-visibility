@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cancellation &amp; Refunds — Visible</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#060810;--surface:rgba(255,255,255,.045);--border:rgba(255,255,255,.08);--border-soft:rgba(255,255,255,.05);--ink:#EEF2FF;--ink-soft:rgba(238,242,255,.56);--ink-muted:rgba(238,242,255,.3);--accent:#6366F1;--accent-bright:#818CF8;--accent-warm:#A78BFA;--success:#34D399;--radius:16px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 55% at -5% 10%,rgba(99,102,241,.13) 0%,transparent 65%),radial-gradient(ellipse 55% 45% at 108% 85%,rgba(34,211,238,.08) 0%,transparent 65%);pointer-events:none;z-index:0}
+  body>*{position:relative;z-index:1}
+  .wrap{max-width:760px;margin:0 auto;padding:0 28px}
+  header{padding:22px 0;border-bottom:1px solid var(--border-soft)}
+  .brandmark{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--ink);text-decoration:none}
+  .brandmark-icon{width:30px;height:30px;background:linear-gradient(135deg,#6366F1,#A78BFA);border-radius:8px;display:flex;align-items:center;justify-content:center}
+  main{padding:64px 0 80px}
+  h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:700;letter-spacing:-.03em;margin-bottom:.5em}
+  h2{font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:600;color:var(--ink);margin:2.2em 0 .6em;padding-top:.5em;border-top:1px solid var(--border-soft)}
+  h2:first-of-type{border-top:none;margin-top:1.5em}
+  p{color:var(--ink-soft);margin-bottom:1em;line-height:1.75}
+  ul{color:var(--ink-soft);padding-left:1.4em;margin-bottom:1em;line-height:1.75}
+  ul li{margin-bottom:.4em}
+  a{color:var(--accent-bright);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent-bright);opacity:.85;margin-bottom:12px}
+  .meta{font-size:13px;color:var(--ink-muted);margin-bottom:2.5em}
+  .highlight-box{background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.18);border-radius:var(--radius);padding:24px 28px;margin:2em 0}
+  .highlight-box p{color:var(--ink-soft);margin-bottom:0}
+  .highlight-box strong{color:var(--success)}
+  .steps{list-style:none;padding:0;counter-reset:steps;margin:1em 0 1.5em}
+  .steps li{counter-increment:steps;display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--border-soft);color:var(--ink-soft)}
+  .steps li:last-child{border-bottom:none}
+  .steps li::before{content:counter(steps);display:flex;align-items:center;justify-content:center;width:26px;height:26px;min-width:26px;border-radius:50%;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.25);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--accent-bright);margin-top:1px}
+  footer{border-top:1px solid var(--border-soft);padding:32px 0;margin-top:40px}
+  .footer-links{display:flex;flex-wrap:wrap;gap:20px;font-size:13px}
+  .footer-links a{color:var(--ink-muted);text-decoration:none}
+  .footer-links a:hover{color:var(--ink-soft)}
+  .footer-copy{font-size:12px;color:var(--ink-muted);margin-top:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a href="/" class="brandmark">
+      <div class="brandmark-icon">
+        <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="white" stroke-width="2"/><circle cx="7" cy="7" r="2" fill="white"/></svg>
+      </div>
+      Visible
+    </a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="eyebrow">Policies</div>
+    <h1>Cancellation &amp; Refunds</h1>
+    <p class="meta">Last updated: June 2025</p>
+
+    <div class="highlight-box">
+      <p><strong>The short version:</strong> Cancel any time by email. No minimum term. No cancellation fee. Your next charge stops immediately. You keep access to Visibility Tracker and any reports you generated during the paid period.</p>
+    </div>
+
+    <h2>How to cancel</h2>
+    <p>Send an email to <a href="mailto:mark@visibleai.co.uk?subject=Cancel%20subscription">mark@visibleai.co.uk</a> with the subject "Cancel subscription". That's all you need to do.</p>
+
+    <ol class="steps">
+      <li>Email <a href="mailto:mark@visibleai.co.uk?subject=Cancel%20subscription">mark@visibleai.co.uk</a> with "Cancel subscription" in the subject.</li>
+      <li>We'll confirm cancellation within one business day.</li>
+      <li>No further charges will be taken from that point.</li>
+      <li>You retain access to Visibility Tracker and all reports you generated during the paid period.</li>
+    </ol>
+
+    <p>There is no cancellation form, no retention flow, and no awkward phone call required. We want cancellation to be as simple as subscribing.</p>
+
+    <h2>Billing and timing</h2>
+    <ul>
+      <li>Visible is billed monthly. Payment is taken at the start of each billing period.</li>
+      <li>When you cancel, we stop the <strong style="color:var(--ink)">next</strong> charge. We do not charge you again after you email us.</li>
+      <li>If you cancel mid-month, your access continues until the end of the period you have already paid for.</li>
+    </ul>
+
+    <h2>Refunds</h2>
+    <p>We do not normally offer partial-month refunds once a billing period has started, but you retain access to Visibility Tracker and any reports generated during that paid period until the end of your subscription term.</p>
+    <p>However, if something has gone seriously wrong — for example, the service was inaccessible or failed to function for a significant portion of a period you were charged for — please email us and we will review your case and issue a refund where it is fair to do so. We'd rather sort it out than leave a customer unhappy.</p>
+    <p>To request a refund: <a href="mailto:mark@visibleai.co.uk?subject=Refund%20request">mark@visibleai.co.uk</a> with "Refund request" in the subject. Please include the email address on your account and a brief description of the issue.</p>
+
+    <h2>Free reports and trials</h2>
+    <p>Free analysis reports generated before subscribing are provided without charge and are not eligible for refund.</p>
+
+    <h2>Questions</h2>
+    <p>If you have any questions about billing or cancellation, email <a href="mailto:mark@visibleai.co.uk">mark@visibleai.co.uk</a> and we'll respond within one business day.</p>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-links">
+      <a href="/">Home</a>
+      <a href="/contact.html">Contact</a>
+      <a href="/privacy.html">Privacy Policy</a>
+      <a href="/terms.html">Terms of Service</a>
+      <a href="/cancellation.html">Cancellation &amp; Refunds</a>
+    </div>
+    <div class="footer-copy">© 2025 Visible. Independent — not affiliated with any AI provider.</div>
+  </div>
+</footer>
+</body>
+</html>

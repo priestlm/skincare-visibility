@@ -54,7 +54,6 @@ function parseRecsJson(text, businessName) {
   return { intro: parsed.intro || '', recommendations: recs, recommendationCount: recs.length, businessMentioned: mentioned };
 }
 
-// Try a single OpenAI-compatible endpoint (Groq or OpenRouter)
 async function tryOpenAI(url, model, prompt, apiKey, extraHeaders, timeout) {
   const payload = {
     model,
@@ -63,7 +62,7 @@ async function tryOpenAI(url, model, prompt, apiKey, extraHeaders, timeout) {
       { role: 'user', content: prompt },
     ],
     temperature: 0.4,
-    max_tokens: 350,
+    max_tokens: 400,
   };
   return postJson(url, payload, timeout, { Authorization: `Bearer ${apiKey}`, ...extraHeaders });
 }
@@ -71,7 +70,7 @@ async function tryOpenAI(url, model, prompt, apiKey, extraHeaders, timeout) {
 async function tryGemini(model, prompt, apiKey) {
   const payload = {
     contents: [{ parts: [{ text: prompt + '\n\nReturn ONLY the JSON object. No markdown.' }] }],
-    generationConfig: { temperature: 0.4, maxOutputTokens: 350 },
+    generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
   };
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   return postJson(endpoint, payload, 12000);
@@ -88,13 +87,14 @@ module.exports = async (req, res) => {
   const { question, businessName, promptType, searchIntent } = body;
   if (!question) return res.status(400).json({ error: 'question is required' });
 
-  const hasGroq = !!process.env.GROQ_API_KEY;
-  const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;
-  if (!hasGroq && !hasOpenRouter) {
+  const GROQ_KEY = process.env.GROQ_API_KEY;
+  const OR_KEY   = process.env.OPENROUTER_API_KEY;
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
+  if (!GROQ_KEY && !OR_KEY && !GEMINI_KEY) {
     return res.status(503).json({ error: 'no_ai_provider' });
   }
 
-  // Brand audit mode — assess what AI knows about a specific brand
+  // ── Brand audit mode ─────────────────────────────────────────────────────────
   if (promptType === 'brand_audit') {
     const intentGuide = {
       'brand recognition':     'Focus only on: what the brand is, when it was founded, what makes it distinctive. Do NOT describe products in detail.',
@@ -120,47 +120,48 @@ Return ONLY valid JSON:
   "confidence": "high or medium or low or unknown"
 }`;
 
-    async function auditAttempt(fn, provider) {
+    async function auditAttempt(fn) {
       try {
         const result = await fn();
         if (result.status === 200) {
-          const text = result.body?.choices?.[0]?.message?.content || '';
+          const text = result.body?.choices?.[0]?.message?.content || result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
           const cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
           const match = cleaned.match(/\{[\s\S]*\}/);
-          if (!match) return { failed: true };
-          const parsed = JSON.parse(match[0]);
-          return { ok: true, data: parsed };
+          if (!match) return null;
+          return JSON.parse(match[0]);
         }
-        return { failed: true };
-      } catch { return { failed: true }; }
+        return null;
+      } catch { return null; }
     }
 
-    if (hasGroq) {
-      const r = await auditAttempt(
-        () => tryOpenAI('https://api.groq.com/openai/v1/chat/completions', 'llama-3.3-70b-versatile', auditPrompt, process.env.GROQ_API_KEY, {}, 12000),
-        'groq'
-      );
-      if (r.ok) return res.status(200).json({ ...r.data, isBrandAudit: true });
-    }
-    if (hasOpenRouter) {
-      for (const model of ['meta-llama/llama-3.1-8b-instruct:free', 'qwen/qwen3-8b:free']) {
-        const r = await auditAttempt(
-          () => tryOpenAI('https://openrouter.ai/api/v1/chat/completions', model, auditPrompt, process.env.OPENROUTER_API_KEY,
-            { 'HTTP-Referer': 'https://visible.ai', 'X-Title': 'Visible AI' }, 12000),
-          'openrouter'
-        );
-        if (r.ok) return res.status(200).json({ ...r.data, isBrandAudit: true });
+    // Run Groq + OpenRouter in parallel for audit
+    const auditCandidates = [];
+    if (GROQ_KEY) auditCandidates.push(
+      auditAttempt(() => tryOpenAI('https://api.groq.com/openai/v1/chat/completions', 'llama-3.3-70b-versatile', auditPrompt, GROQ_KEY, {}, 12000))
+    );
+    if (OR_KEY) auditCandidates.push(
+      auditAttempt(() => tryOpenAI('https://openrouter.ai/api/v1/chat/completions', 'meta-llama/llama-3.3-70b-instruct:free', auditPrompt, OR_KEY,
+        { 'HTTP-Referer': 'https://visible.ai', 'X-Title': 'Visible AI' }, 12000))
+    );
+
+    const auditResults = await Promise.allSettled(auditCandidates);
+    for (const r of auditResults) {
+      if (r.status === 'fulfilled' && r.value) {
+        return res.status(200).json({ ...r.value, isBrandAudit: true });
       }
     }
     return res.status(200).json({ recognised: false, response: '', products_mentioned: [], channels_mentioned: [], confidence: 'unknown', isBrandAudit: true });
   }
 
-  const prompt = `A person asked an AI assistant: "${question}"
+  // ── Discovery / comparison / occasion query ──────────────────────────────────
+  const prompt = `A real person typed this into an AI assistant: "${question}"
 
-You are that AI assistant. List 4-5 real brand or business recommendations. Be specific — name actual brands, not generic descriptions.
+You are that AI assistant responding with genuine brand recommendations. Name 4-5 real, specific brands or businesses that actually exist and are relevant to this query. Be concrete — name actual brands, products, or services.
 
 Return ONLY valid JSON:
-{"intro":"one sentence","recommendations":[{"name":"Brand Name","reason":"one sentence why"}]}`;
+{"intro":"one sentence summarising what you'd recommend and why","recommendations":[{"name":"Real Brand Name","reason":"one specific sentence about why this brand fits the query"}]}
+
+Important: Only name brands you are confident actually exist and are relevant. Do not make up brand names.`;
 
   function extractText(result, provider) {
     if (provider === 'gemini') return result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -184,26 +185,23 @@ Return ONLY valid JSON:
     }
   }
 
-  // 1. Groq — primary
-  if (hasGroq) {
-    const r = await attempt(
-      () => tryOpenAI('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', prompt, process.env.GROQ_API_KEY, {}, 8000),
-      'groq'
-    );
-    if (r.ok) return res.status(200).json({ ...r.data, businessName: businessName || '' });
-    if (r.rateLimited) console.log('Groq rate-limited, trying OpenRouter');
-  }
+  // Run all available providers in parallel — first valid response wins
+  const candidates = [];
+  if (GROQ_KEY) candidates.push(
+    attempt(() => tryOpenAI('https://api.groq.com/openai/v1/chat/completions', 'llama-3.1-8b-instant', prompt, GROQ_KEY, {}, 10000), 'groq')
+  );
+  if (OR_KEY) candidates.push(
+    attempt(() => tryOpenAI('https://openrouter.ai/api/v1/chat/completions', 'meta-llama/llama-3.3-70b-instruct:free', prompt, OR_KEY,
+      { 'HTTP-Referer': 'https://visible.ai', 'X-Title': 'Visible AI' }, 12000), 'openrouter')
+  );
+  if (GEMINI_KEY) candidates.push(
+    attempt(() => tryGemini('gemini-2.0-flash', prompt, GEMINI_KEY), 'gemini')
+  );
 
-  // 2. OpenRouter free models as fallback
-  if (hasOpenRouter) {
-    for (const model of ['deepseek/deepseek-r1:free', 'deepseek/deepseek-chat-v3-0324:free', 'qwen/qwen3-8b:free']) {
-      const r = await attempt(
-        () => tryOpenAI('https://openrouter.ai/api/v1/chat/completions', model, prompt, process.env.OPENROUTER_API_KEY,
-          { 'HTTP-Referer': 'https://visible.ai', 'X-Title': 'Visible AI' }, 10000),
-        'openrouter-' + model
-      );
-      if (r.ok) return res.status(200).json({ ...r.data, businessName: businessName || '' });
-      if (r.rateLimited) continue;
+  const settled = await Promise.allSettled(candidates);
+  for (const r of settled) {
+    if (r.status === 'fulfilled' && r.value?.ok) {
+      return res.status(200).json({ ...r.value.data, businessName: businessName || '' });
     }
   }
 

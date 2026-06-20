@@ -9,6 +9,18 @@
     "api/ask.js": {
       "memory": 256,
       "maxDuration": 30
+    },
+    "api/admin.js": {
+      "memory": 256,
+      "maxDuration": 15
+    },
+    "api/competitors.js": {
+      "memory": 256,
+      "maxDuration": 30
+    },
+    "api/history.js": {
+      "memory": 256,
+      "maxDuration": 15
     }
   }
 }

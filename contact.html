@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact — Visible</title>
+<meta name="description" content="Get in touch with the Visible team.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#060810;--surface:rgba(255,255,255,.045);--surface-2:rgba(255,255,255,.07);
+    --border:rgba(255,255,255,.08);--border-soft:rgba(255,255,255,.05);
+    --border-accent:rgba(99,102,241,.38);--ink:#EEF2FF;--ink-soft:rgba(238,242,255,.56);
+    --ink-muted:rgba(238,242,255,.3);--accent:#6366F1;--accent-bright:#818CF8;
+    --accent-warm:#A78BFA;--radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 70% 55% at -5% 10%,rgba(99,102,241,.13) 0%,transparent 65%),radial-gradient(ellipse 55% 45% at 108% 85%,rgba(34,211,238,.08) 0%,transparent 65%);pointer-events:none;z-index:0}
+  body>*{position:relative;z-index:1}
+  .wrap{max-width:760px;margin:0 auto;padding:0 28px}
+  header{padding:22px 0;border-bottom:1px solid var(--border-soft)}
+  .brandmark{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--ink);text-decoration:none}
+  .brandmark-icon{width:30px;height:30px;background:linear-gradient(135deg,#6366F1,#A78BFA);border-radius:8px;display:flex;align-items:center;justify-content:center}
+  main{padding:64px 0 80px}
+  h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:700;letter-spacing:-.03em;margin-bottom:.5em;color:var(--ink)}
+  h2{font-family:'Space Grotesk',sans-serif;font-size:1.15rem;font-weight:600;color:var(--ink);margin:2em 0 .5em}
+  p{color:var(--ink-soft);margin-bottom:1em;line-height:1.75}
+  a{color:var(--accent-bright);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent-bright);opacity:.85;margin-bottom:12px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin:32px 0}
+  .contact-method{display:flex;align-items:center;gap:14px;padding:18px 0;border-bottom:1px solid var(--border-soft)}
+  .contact-method:last-child{border-bottom:none}
+  .contact-icon{width:40px;height:40px;border-radius:10px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.2);display:flex;align-items:center;justify-content:center;flex:none}
+  .contact-label{font-size:13px;color:var(--ink-muted);margin-bottom:2px}
+  .contact-value{font-weight:600;color:var(--ink);font-size:15px}
+  footer{border-top:1px solid var(--border-soft);padding:32px 0;margin-top:40px}
+  .footer-links{display:flex;flex-wrap:wrap;gap:20px;font-size:13px}
+  .footer-links a{color:var(--ink-muted);text-decoration:none}
+  .footer-links a:hover{color:var(--ink-soft)}
+  .footer-copy{font-size:12px;color:var(--ink-muted);margin-top:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a href="/" class="brandmark">
+      <div class="brandmark-icon">
+        <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7" cy="7" r="5" stroke="white" stroke-width="2"/>
+          <circle cx="7" cy="7" r="2" fill="white"/>
+        </svg>
+      </div>
+      Visible
+    </a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="eyebrow">Support</div>
+    <h1>Contact us</h1>
+    <p>We're a small team and aim to respond to all enquiries within one business day. Whether it's a question about your report, a billing issue, or feedback on the product — drop us a message.</p>
+
+    <div class="card">
+      <div class="contact-method">
+        <div class="contact-icon">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18" color="#818CF8">
+            <rect x="2" y="4" width="16" height="13" rx="2"/><path d="M2 7l8 5 8-5"/>
+          </svg>
+        </div>
+        <div>
+          <div class="contact-label">Email — general enquiries &amp; support</div>
+          <div class="contact-value"><a href="mailto:mark@visibleai.co.uk">mark@visibleai.co.uk</a></div>
+        </div>
+      </div>
+      <div class="contact-method">
+        <div class="contact-icon">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18" color="#818CF8">
+            <path d="M10 2a8 8 0 100 16A8 8 0 0010 2z"/><path d="M10 6v4l3 3"/>
+          </svg>
+        </div>
+        <div>
+          <div class="contact-label">Response time</div>
+          <div class="contact-value">Within 1 business day (Mon–Fri, UK hours)</div>
+        </div>
+      </div>
+    </div>
+
+    <h2>Common enquiries</h2>
+    <p><strong style="color:var(--ink)">Cancel my subscription</strong><br>
+    Email <a href="mailto:mark@visibleai.co.uk?subject=Cancel%20subscription">mark@visibleai.co.uk</a> with the subject "Cancel subscription". We'll stop the next charge immediately — no questions asked.</p>
+
+    <p><strong style="color:var(--ink)">Question about my report</strong><br>
+    Email us with your website URL and a brief description of the query. We're happy to walk through the results with you.</p>
+
+    <p><strong style="color:var(--ink)">Billing or payment issue</strong><br>
+    Email <a href="mailto:mark@visibleai.co.uk?subject=Billing%20enquiry">mark@visibleai.co.uk</a> with "Billing" in the subject and we'll look into it right away.</p>
+
+    <p><strong style="color:var(--ink)">Product feedback</strong><br>
+    We read every message. If something isn't working as you'd expect or you have a suggestion, let us know.</p>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-links">
+      <a href="/">Home</a>
+      <a href="/contact.html">Contact</a>
+      <a href="/privacy.html">Privacy Policy</a>
+      <a href="/terms.html">Terms of Service</a>
+      <a href="/cancellation.html">Cancellation &amp; Refunds</a>
+    </div>
+    <div class="footer-copy">© 2025 Visible. Independent — not affiliated with any AI provider.</div>
+  </div>
+</footer>
+</body>
+</html>
