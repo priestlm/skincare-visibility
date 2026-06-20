@@ -957,10 +957,10 @@ async function callOpenRouter(prompt) {
 }
 
 // ── Top-up: stored questions first, then AI if still short ───────────────────
-async function topUpQuestions(aiResult, existingQs, brandPhrases, primaryKey, needed, market) {
+async function topUpQuestions(aiResult, existingQs, brandPhrases, primaryKey, needed, market, alreadyRunSet = new Set()) {
   const topicWords = (aiResult.allowed_topics || []).flatMap(t => t.toLowerCase().split(/[\s,&\/]+/)).filter(w => w.length > 2);
   const niche = (aiResult.detected_niche || '').toLowerCase();
-  const existingSet = new Set(existingQs.map(q => q.question.toLowerCase()));
+  const existingSet = new Set([...existingQs.map(q => q.question.toLowerCase()), ...alreadyRunSet]);
 
   // 1. Try the question store first (fast, free, no AI call)
   const stored = await getStoredQuestions(primaryKey, niche, topicWords, needed + 5, existingSet);
@@ -1625,7 +1625,8 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const body = await readBody(req);
-  let { url: targetUrl, brandName = '', market, manualCategory, userLocation, bustCache = false } = body;
+  let { url: targetUrl, brandName = '', market, manualCategory, userLocation, bustCache = false, excludeQuestions = [] } = body;
+  const excludeSet = new Set((excludeQuestions || []).map(q => q.toLowerCase().trim()));
   // userLocation: { town, county, country } — optional, from browser geolocation
   if (!targetUrl) return res.status(400).json({ error: 'url is required' });
   if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
@@ -1735,14 +1736,20 @@ module.exports = async (req, res) => {
     }
 
     questionsRich = dedupQuestions(questionsRich);
+
+    // Strip questions already in the user's queryBank (passed as excludeQuestions)
+    if (excludeSet.size > 0) {
+      questionsRich = questionsRich.filter(q => !excludeSet.has(q.question.toLowerCase().trim()));
+    }
+
     questions = questionsRich.map(q => q.question);
 
-    const MIN_QUESTIONS = 20;
+    const MIN_QUESTIONS = 15;
     if (questionsRich.length < MIN_QUESTIONS) {
       const brandPhrases = [organisationName, aiBrand, brandName]
         .map(s => (s || '').toLowerCase().trim()).filter(s => s.length > 3);
       const needed = MIN_QUESTIONS - questionsRich.length;
-      const extra = await topUpQuestions(ai, questionsRich, brandPhrases, primary, needed + 3, market);
+      const extra = await topUpQuestions(ai, questionsRich, brandPhrases, primary, needed + 3, market, excludeSet);
       questionsRich = dedupQuestions([...questionsRich, ...extra]);
     }
 

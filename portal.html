@@ -2540,7 +2540,10 @@
       setStep('analyse', 'active', '');
       setPb(5);
       var userLocation = await detectUserLocation();
-      var ar = await post('/api/analyse', { url: url, brandName: brand, userLocation: userLocation });
+      // Pass existing questions so analyse skips them and generates fresh ones
+      var existingOrg = (currentUser && currentUser.organisations || []).find(function(o) { return o.url === url; });
+      var existingQs = existingOrg && existingOrg.queryBank ? existingOrg.queryBank.map(function(e) { return e.question; }) : [];
+      var ar = await post('/api/analyse', { url: url, brandName: brand, userLocation: userLocation, bustCache: existingQs.length > 0, excludeQuestions: existingQs });
       if (!ar.ok) throw new Error('Analysis failed (' + ar.status + ')');
       var analysis = await ar.json();
       if (analysis.needsManualCategory) throw new Error('Could not detect brand category');
