@@ -262,6 +262,21 @@ module.exports = async (req, res) => {
     }
   }
 
+  // ── Delete organisation ──
+  if (action === 'delete_org') {
+    const { orgUrl } = body;
+    if (!orgUrl) return res.status(400).json({ error: 'url_required' });
+    try {
+      const user = await getSessionUser(req);
+      if (!user) return res.status(401).json({ error: 'unauthenticated' });
+      user.organisations = (user.organisations || []).filter(o => o.url !== orgUrl);
+      await redisSet(`user:${user.email}`, JSON.stringify(user));
+      return res.status(200).json({ ok: true, user: safeUser(user) });
+    } catch (e) {
+      return res.status(500).json({ error: 'server_error' });
+    }
+  }
+
   // ── Logout ──
   if (action === 'logout') {
     const auth = (req.headers.authorization || '').replace('Bearer ', '').trim();

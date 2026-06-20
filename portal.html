@@ -221,6 +221,14 @@
     transition: background .15s;
   }
   .btn-view-report:hover { background: rgba(99,102,241,.14) }
+  .btn-delete-org {
+    padding: 5px 10px; border-radius: 7px; cursor: pointer; white-space: nowrap; text-align: center;
+    border: 1px solid rgba(248,113,113,.25); background: transparent;
+    color: var(--danger); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+    transition: background .15s; opacity: .7;
+  }
+  .btn-delete-org:hover { background: rgba(248,113,113,.08); opacity: 1 }
+  .btn-delete-org:disabled { opacity: .4; cursor: default }
 
   /* ── Add URL section ── */
   .add-url-form { display: flex; flex-direction: column; gap: 10px; margin-top: 16px }
@@ -1432,6 +1440,7 @@
             ? '<button class="btn-view-report" type="button" data-org-idx="' + idx + '" aria-label="View report for ' + x(org.name) + '">View report</button>'
             : '') +
           '<button class="btn-run" type="button" data-org-idx="' + idx + '" aria-label="' + (hasData ? 'Refresh data for ' : 'Run first report for ') + x(org.name) + '">' + (hasData ? 'Refresh data' : 'Run report →') + '</button>' +
+          '<button class="btn-delete-org" type="button" data-org-idx="' + idx + '" aria-label="Remove ' + x(org.name) + '">Remove</button>' +
         '</div>' +
       '</div>';
     }
@@ -1460,6 +1469,28 @@
       body.querySelectorAll('.btn-view-report[data-org-idx]').forEach(function(btn) {
         var org = orgs[parseInt(btn.dataset.orgIdx, 10)];
         if (org) btn.addEventListener('click', function() { viewFromQueryBank(org); });
+      });
+      body.querySelectorAll('.btn-delete-org[data-org-idx]').forEach(function(btn) {
+        var org = orgs[parseInt(btn.dataset.orgIdx, 10)];
+        if (!org) return;
+        btn.addEventListener('click', async function() {
+          if (!confirm('Remove ' + org.name + ' from your tracker? This cannot be undone.')) return;
+          btn.disabled = true; btn.textContent = 'Removing…';
+          try {
+            var res = await fetch('/api/auth', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+              body: JSON.stringify({ action: 'delete_org', orgUrl: org.url })
+            });
+            var data = await res.json();
+            if (data.user) {
+              currentUser = data.user;
+              renderOrgs(); renderSavedReports(); renderAccount();
+            } else {
+              btn.disabled = false; btn.textContent = 'Remove';
+            }
+          } catch(e) { btn.disabled = false; btn.textContent = 'Remove'; }
+        });
       });
       body.querySelectorAll('.btn-view-hist[data-hist-idx]').forEach(function(btn) {
         var report = allReports[parseInt(btn.dataset.histIdx, 10)];
@@ -1573,7 +1604,7 @@
   }
 
   function viewFromQueryBank(org) {
-    var agg = computeAggregated(org, allReports, null);
+    var agg = computeAggregated(org, (currentUser && currentUser.reports) || [], null);
     var queryResults = (org.queryBank || []).map(function(entry) {
       var latest = entry.results[entry.results.length - 1] || {};
       return {
