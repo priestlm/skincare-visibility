@@ -521,6 +521,32 @@
   .gen-fact { margin-top: 28px; padding: 12px 16px; border-radius: 10px; background: rgba(99,102,241,.06); border: 1px solid rgba(99,102,241,.12); font-size: 13px; color: var(--ink-muted); min-height: 44px; transition: opacity .5s }
   .gen-fact strong { color: var(--ink-soft) }
 
+  /* ── Run split (new vs all) ── */
+  .rpt-run-split { display:flex; align-items:stretch; gap:0; margin-bottom:20px; border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,.08) }
+  .rpt-run-panel { flex:1; padding:14px 18px }
+  .rpt-run-panel.new-run { background:rgba(99,102,241,.08) }
+  .rpt-run-panel.all-data { background:rgba(16,185,129,.06) }
+  .rpt-run-divider { width:1px; background:rgba(255,255,255,.07); flex:none }
+  .rpt-run-lbl { font-size:10px; text-transform:uppercase; letter-spacing:.1em; font-family:'JetBrains Mono',monospace; color:var(--ink-muted); margin-bottom:6px }
+  .rpt-run-score { font-size:1.8rem; font-weight:700; font-family:'Space Grotesk',sans-serif; line-height:1 }
+  .rpt-run-score.new-run { color:var(--accent-bright) }
+  .rpt-run-score.all-data { color:var(--success) }
+  .rpt-run-detail { font-size:12.5px; color:var(--ink-muted); margin-top:4px }
+
+  /* ── Query card feedback ── */
+  .q-new-badge { display:inline-block; padding:2px 7px; border-radius:4px; font-size:10px; font-family:'JetBrains Mono',monospace; background:rgba(99,102,241,.18); color:var(--accent-bright); border:1px solid rgba(99,102,241,.3); margin-left:6px; vertical-align:middle }
+  .q-item.irrelevant { opacity:.45 }
+  .q-item.irrelevant .q-head { text-decoration: line-through; text-decoration-color: rgba(255,255,255,.2) }
+  .btn-not-relevant { margin-top:12px; padding:4px 10px; border-radius:6px; border:1px solid rgba(255,255,255,.1); background:transparent; color:var(--ink-muted); font-size:11.5px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .15s }
+  .btn-not-relevant:hover { border-color:rgba(248,113,113,.4); color:var(--danger) }
+  .btn-not-relevant.restore { border-color:rgba(52,211,153,.3); color:var(--success) }
+  .btn-not-relevant.restore:hover { background:rgba(52,211,153,.08) }
+
+  /* ── Competitor exclusion ── */
+  .btn-not-comp { padding:3px 9px; border-radius:5px; border:1px solid rgba(255,255,255,.08); background:transparent; color:var(--ink-muted); font-size:11px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .15s; margin-left:6px }
+  .btn-not-comp:hover { border-color:rgba(248,113,113,.4); color:var(--danger) }
+  .comp-excluded-notice { font-size:12px; color:var(--ink-muted); padding:6px 0; font-style:italic }
+
   /* ── Report content shared styles ── */
   .rpt-sec {
     background: var(--surface);
@@ -1215,7 +1241,9 @@
   // ── Compute aggregated stats from org's queryBank (+ legacy reports fallback) ──
   function computeAggregated(org, allReports, maxRuns) {
     function normU(u) { return (u || '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/+$/, '').toLowerCase(); }
-    var queryBank  = (org.queryBank  || []).map(function(q) { return { question: q.question, promptType: q.promptType, results: q.results.slice() }; });
+    var excludedCompsSet = new Set((org.excludedCompetitors || []).map(function(c) { return c.toLowerCase(); }));
+    // Only include relevant questions (skip irrelevant ones for scoring)
+    var queryBank  = (org.queryBank  || []).filter(function(q) { return !q.irrelevant; }).map(function(q) { return { question: q.question, promptType: q.promptType, results: q.results.slice() }; });
     var runHistory = (org.runHistory || []).slice();
 
     // Backwards-compat: synthesise from legacy user.reports if no queryBank yet
@@ -1269,7 +1297,9 @@
         }
       });
     });
-    var topComps = Object.keys(compFreq).map(function(n) { return { name: n, count: compFreq[n] }; })
+    var topComps = Object.keys(compFreq)
+      .filter(function(n) { return !excludedCompsSet.has(n.toLowerCase()); })
+      .map(function(n) { return { name: n, count: compFreq[n] }; })
       .sort(function(a, b) { return b.count - a.count; }).slice(0, 5);
 
     return { score: score, totalQ: totalQ, mentions: mentions, topComps: topComps, runCount: filteredHistory.length, runHistory: filteredHistory };
@@ -1611,8 +1641,24 @@
 
   function viewFromQueryBank(org) {
     var agg = computeAggregated(org, (currentUser && currentUser.reports) || [], null);
+
+    // Identify latest run date for "new" query tagging
+    var latestRunDate = (org.runHistory && org.runHistory.length > 0)
+      ? org.runHistory[org.runHistory.length - 1].runDate : null;
+
+    // Compute "this refresh" stats (questions that appeared in the latest run)
+    var latestRun = null;
+    if (latestRunDate && org.runHistory && org.runHistory.length >= 1) {
+      var lrh = org.runHistory[org.runHistory.length - 1];
+      latestRun = { score: lrh.score || 0, mentions: lrh.mentions || 0, totalQ: lrh.totalQ || 0, runDate: latestRunDate };
+    }
+
+    var excludedCompsSet = new Set((org.excludedCompetitors || []).map(function(c) { return c.toLowerCase(); }));
+
+    // Build queryResults from ALL queryBank entries (relevant + irrelevant, for display)
     var queryResults = (org.queryBank || []).map(function(entry) {
       var latest = entry.results[entry.results.length - 1] || {};
+      var isNew = !!(latestRunDate && latest.runDate === latestRunDate);
       return {
         question: entry.question,
         promptType: entry.promptType || 'general',
@@ -1620,9 +1666,14 @@
         quality: latest.quality || null,
         recCount: (latest.competitors || []).length,
         error: false,
-        recommendations: (latest.competitors || []).map(function(name) { return { name: name }; }),
+        irrelevant: !!entry.irrelevant,
+        isNew: isNew,
+        recommendations: (latest.competitors || [])
+          .filter(function(name) { return !excludedCompsSet.has(name.toLowerCase()); })
+          .map(function(name) { return { name: name }; }),
       };
     });
+
     var reportData = {
       generatedAt: org.lastRunAt || new Date().toISOString(),
       savedAt: org.lastRunAt || new Date().toISOString(),
@@ -1636,6 +1687,9 @@
       recommendations: org.recommendations || [],
       riskNarrative: org.riskNarrative || '',
       runHistory: agg.runHistory,
+      latestRun: latestRun,
+      orgUrl: org.url,
+      excludedCompetitors: org.excludedCompetitors || [],
     };
     viewSavedReport(reportData);
   }
@@ -1983,21 +2037,28 @@
         interp = 'AI currently recommends ' + (compNames || 'other brands') + ' for this query. That\'s not a verdict — it\'s a content gap. A dedicated FAQ entry or landing page for this topic is the most direct route to appearing here.';
       }
 
-      return '<div class="q-item">' +
+      var isIrrelevant = !!q.irrelevant;
+      var isNew = !!q.isNew;
+      return '<div class="q-item' + (isIrrelevant ? ' irrelevant' : '') + '" data-question="' + x(q.question) + '">' +
         '<div class="q-head">' +
           '<div style="flex:1">' +
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">' +
               '<span class="ptype ' + pt + '">' + (ptypeLabel[pt] || pt) + '</span>' +
               '<span class="conf-badge ' + quality + '">' + (confLabel[quality] || quality) + '</span>' +
+              (isNew ? '<span class="q-new-badge">New this run</span>' : '') +
+              (isIrrelevant ? '<span style="font-size:10px;color:var(--ink-muted);font-family:\'JetBrains Mono\',monospace;background:rgba(255,255,255,.05);padding:2px 7px;border-radius:4px">Excluded from score</span>' : '') +
             '</div>' +
             '<span class="q-text" style="display:block">' + x(q.question) + '</span>' +
           '</div>' +
           '<span class="q-status ' + (q.businessMentioned && quality !== 'empty' ? 'yes' : 'no') + '" style="margin-left:12px">' + (q.businessMentioned ? '✓ Appeared' : quality === 'empty' ? '— No result' : '→ Gap') + '</span>' +
         '</div>' +
         '<div class="q-body">' +
-          '<span class="result-type-tag ' + resultType + '">' + x(resultTag) + '</span>' +
-          '<div class="q-interpretation"><span class="q-interp-label">What this means</span>' + x(interp) + '</div>' +
-          (recsHtml ? '<div class="q-comp-label">Brands currently appearing for this query</div><div class="q-recs">' + recsHtml + '</div>' : '') +
+          (isIrrelevant ? '' : '<span class="result-type-tag ' + resultType + '">' + x(resultTag) + '</span>') +
+          (isIrrelevant ? '' : '<div class="q-interpretation"><span class="q-interp-label">What this means</span>' + x(interp) + '</div>') +
+          (recsHtml && !isIrrelevant ? '<div class="q-comp-label">Brands currently appearing for this query</div><div class="q-recs">' + recsHtml + '</div>' : '') +
+          '<button class="btn-not-relevant' + (isIrrelevant ? ' restore' : '') + '" data-question="' + x(q.question) + '" data-org-url="' + x(orgUrl) + '" data-irrelevant="' + isIrrelevant + '">' +
+            (isIrrelevant ? '↩ Restore — mark as relevant' : 'Mark as not relevant to my business') +
+          '</button>' +
         '</div>' +
       '</div>';
     }).join('');
@@ -2018,6 +2079,7 @@
               '<span id="' + safeId + '-name" class="comp-name">' + x(c.name) + '</span>' +
               '<span class="comp-cred ' + cred + '">' + credLabel + '</span>' +
               '<span id="' + safeId + '-loc" style="font-size:11.5px;color:var(--ink-muted)"></span>' +
+              '<button class="btn-not-comp" data-comp-name="' + x(c.name) + '" data-org-url="' + x(orgUrl) + '" title="Exclude from competitor tracking">Not a competitor</button>' +
             '</div>' +
             '<div style="display:flex;align-items:center;gap:12px">' +
               '<div class="comp-bar-wrap"><div class="comp-bar" style="width:' + Math.round((c.count / maxC) * 100) + '%"></div></div>' +
@@ -2102,6 +2164,10 @@
       '</div>';
     }).join('');
 
+    var latestRun = r.latestRun || null;
+    var orgUrl = r.orgUrl || (biz && biz.url) || '';
+    var excludedComps = new Set((r.excludedCompetitors || []).map(function(c) { return c.toLowerCase(); }));
+
     var dateStr = new Date(r.generatedAt).toLocaleDateString('en-GB', {day: 'numeric', month: 'long', year: 'numeric'});
 
     // Cover stats computed values
@@ -2155,6 +2221,22 @@
           (biz.niche ? '<span class="stag signal">' + x(biz.niche) + '</span>' : '') +
           (biz.locationSignals ? '<span class="stag loc">' + x(biz.locationSignals) + '</span>' : '') +
         '</div>' +
+        // Run split — only shown when we have latestRun data
+        (latestRun ? (
+          '<div class="rpt-run-split">' +
+            '<div class="rpt-run-panel new-run">' +
+              '<div class="rpt-run-lbl">This refresh · ' + new Date(latestRun.runDate).toLocaleDateString('en-GB', {day:'numeric',month:'short'}) + '</div>' +
+              '<div class="rpt-run-score new-run">' + latestRun.score + '%</div>' +
+              '<div class="rpt-run-detail">' + latestRun.mentions + ' of ' + latestRun.totalQ + ' new queries · brand ' + (latestRun.mentions === 0 ? 'not found' : 'appeared') + '</div>' +
+            '</div>' +
+            '<div class="rpt-run-divider"></div>' +
+            '<div class="rpt-run-panel all-data">' +
+              '<div class="rpt-run-lbl">All data · ' + totalQ + ' total queries</div>' +
+              '<div class="rpt-run-score all-data">' + score + '%</div>' +
+              '<div class="rpt-run-detail">' + mentionCount + ' appearances across ' + (r.runHistory ? r.runHistory.length : 1) + ' report' + ((r.runHistory && r.runHistory.length !== 1) ? 's' : '') + ' in dataset</div>' +
+            '</div>' +
+          '</div>'
+        ) : '') +
         // Stat grid
         '<div class="rpt-stat-grid">' +
           // Gauge tile
@@ -2589,6 +2671,8 @@
       // Pass existing questions so analyse skips them and generates fresh ones
       var existingOrg = (currentUser && currentUser.organisations || []).find(function(o) { return o.url === url; });
       var existingQs = existingOrg && existingOrg.queryBank ? existingOrg.queryBank.map(function(e) { return e.question; }) : [];
+      // Also exclude questions the user marked as irrelevant — don't replace them with more bad questions
+      // (irrelevant ones stay in the bank for transparency but never get re-run)
       var ar = await post('/api/analyse', { url: url, brandName: brand, userLocation: userLocation, bustCache: existingQs.length > 0, excludeQuestions: existingQs });
       if (!ar.ok) throw new Error('Analysis failed (' + ar.status + ')');
       var analysis = await ar.json();
@@ -2738,6 +2822,53 @@
         '<button class="btn-back-dash" onclick="document.getElementById(\'report-view\').style.display=\'none\';document.getElementById(\'portal\').style.display=\'block\'">← Back to Tracker</button>';
     }
   }
+
+  // Report interactivity — "not relevant" + "not a competitor" buttons
+  document.getElementById('rpt-content').addEventListener('click', async function(e) {
+    // Not relevant / restore
+    var relBtn = e.target.closest('.btn-not-relevant');
+    if (relBtn && token) {
+      var question = relBtn.dataset.question;
+      var orgUrl2 = relBtn.dataset.orgUrl;
+      var isIrrelevantNow = relBtn.dataset.irrelevant === 'true';
+      relBtn.disabled = true; relBtn.textContent = 'Saving…';
+      try {
+        var res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ action: 'mark_question_relevance', orgUrl: orgUrl2, question: question, relevant: isIrrelevantNow })
+        });
+        var data = await res.json();
+        if (data.user) {
+          currentUser = data.user;
+          var updatedOrg = (currentUser.organisations || []).find(function(o) { return o.url === orgUrl2; });
+          if (updatedOrg) viewFromQueryBank(updatedOrg);
+        }
+      } catch(e2) { relBtn.disabled = false; relBtn.textContent = isIrrelevantNow ? '↩ Restore' : 'Mark as not relevant'; }
+      return;
+    }
+    // Not a competitor
+    var compBtn = e.target.closest('.btn-not-comp');
+    if (compBtn && token) {
+      var compName = compBtn.dataset.compName;
+      var orgUrl3 = compBtn.dataset.orgUrl;
+      compBtn.disabled = true; compBtn.textContent = 'Excluding…';
+      try {
+        var res2 = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ action: 'exclude_competitor', orgUrl: orgUrl3, competitorName: compName, excluded: true })
+        });
+        var data2 = await res2.json();
+        if (data2.user) {
+          currentUser = data2.user;
+          var updatedOrg2 = (currentUser.organisations || []).find(function(o) { return o.url === orgUrl3; });
+          if (updatedOrg2) viewFromQueryBank(updatedOrg2);
+        }
+      } catch(e3) { compBtn.disabled = false; compBtn.textContent = 'Not a competitor'; }
+      return;
+    }
+  });
 
   // Back button
   document.getElementById('btn-back-dash').addEventListener('click', function() {

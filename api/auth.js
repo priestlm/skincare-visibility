@@ -277,6 +277,50 @@ module.exports = async (req, res) => {
     }
   }
 
+  // ── Mark question relevance ──
+  if (action === 'mark_question_relevance') {
+    const { orgUrl, question, relevant } = body;
+    try {
+      const user = await getSessionUser(req);
+      if (!user) return res.status(401).json({ error: 'unauthenticated' });
+      function normUrl2(u) {
+        try { return new URL((u||'').startsWith('http') ? u : 'https://'+u).hostname.replace(/^www\./,'').toLowerCase(); }
+        catch { return (u||'').toLowerCase().replace(/^www\./,''); }
+      }
+      const org = (user.organisations||[]).find(o => normUrl2(o.url) === normUrl2(orgUrl));
+      if (org) {
+        const entry = (org.queryBank||[]).find(e => e.question === question);
+        if (entry) entry.irrelevant = !relevant;
+      }
+      await redisSet(`user:${user.email}`, JSON.stringify(user));
+      return res.status(200).json({ ok: true, user: safeUser(user) });
+    } catch(e) { return res.status(500).json({ error: 'server_error' }); }
+  }
+
+  // ── Exclude / restore competitor ──
+  if (action === 'exclude_competitor') {
+    const { orgUrl, competitorName, excluded } = body;
+    try {
+      const user = await getSessionUser(req);
+      if (!user) return res.status(401).json({ error: 'unauthenticated' });
+      function normUrl3(u) {
+        try { return new URL((u||'').startsWith('http') ? u : 'https://'+u).hostname.replace(/^www\./,'').toLowerCase(); }
+        catch { return (u||'').toLowerCase().replace(/^www\./,''); }
+      }
+      const org = (user.organisations||[]).find(o => normUrl3(o.url) === normUrl3(orgUrl));
+      if (org) {
+        org.excludedCompetitors = org.excludedCompetitors || [];
+        if (excluded) {
+          if (!org.excludedCompetitors.includes(competitorName)) org.excludedCompetitors.push(competitorName);
+        } else {
+          org.excludedCompetitors = org.excludedCompetitors.filter(c => c !== competitorName);
+        }
+      }
+      await redisSet(`user:${user.email}`, JSON.stringify(user));
+      return res.status(200).json({ ok: true, user: safeUser(user) });
+    } catch(e) { return res.status(500).json({ error: 'server_error' }); }
+  }
+
   // ── Logout ──
   if (action === 'logout') {
     const auth = (req.headers.authorization || '').replace('Bearer ', '').trim();
