@@ -504,7 +504,8 @@
     width: 10px; height: 10px; border-radius: 50%; flex: none;
     background: var(--border);
   }
-  .gen-step.active .gen-step-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent) }
+  .gen-step.active .gen-step-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: gen-pulse 1.2s ease-in-out infinite }
+  @keyframes gen-pulse { 0%,100% { opacity:1; transform:scale(1) } 50% { opacity:.5; transform:scale(1.35) } }
   .gen-step.done .gen-step-dot { background: var(--success) }
   .gen-step.error .gen-step-dot { background: var(--danger) }
   .gen-step-label { font-size: 14px; color: var(--ink-muted); flex: 1 }
@@ -514,7 +515,11 @@
   .gen-step.active .gen-step-status { color: var(--accent-bright) }
   .gen-step.done .gen-step-status { color: var(--success) }
   .gen-pb-wrap { height: 4px; background: var(--border); border-radius: 2px; margin-top: 20px; overflow: hidden }
-  .gen-pb { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-warm)); border-radius: 2px; width: 0; transition: width .4s }
+  .gen-pb { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-warm)); border-radius: 2px; width: 0; transition: width .4s; position: relative; overflow: hidden }
+  .gen-pb::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.25) 50%,transparent 100%); animation: gen-shimmer 1.4s linear infinite }
+  @keyframes gen-shimmer { from { transform: translateX(-100%) } to { transform: translateX(200%) } }
+  .gen-fact { margin-top: 28px; padding: 12px 16px; border-radius: 10px; background: rgba(99,102,241,.06); border: 1px solid rgba(99,102,241,.12); font-size: 13px; color: var(--ink-muted); min-height: 44px; transition: opacity .5s }
+  .gen-fact strong { color: var(--ink-soft) }
 
   /* ── Report content shared styles ── */
   .rpt-sec {
@@ -1042,6 +1047,7 @@
       <p style="font-size:14px;color:var(--ink-muted);margin-bottom:24px">This may take a moment while we test prompts and analyse competitors.</p>
       <div class="gen-steps" id="gen-steps"></div>
       <div class="gen-pb-wrap" style="margin-top:24px"><div class="gen-pb" id="gen-pb"></div></div>
+      <div class="gen-fact" id="gen-fact" style="display:none"></div>
     </div>
     <div id="save-note" style="display:none;font-size:13.5px;color:var(--ink-muted);padding:10px 0 0;line-height:1.6">Report saved to your Tracker. Run future reports to track how your visibility changes over time.</div>
     <!-- Report content (rendered after generation) -->
@@ -2500,6 +2506,29 @@
   }
 
   async function runFullReport(url, brand) {
+    // Collect existing org data for rotating facts + question exclusion
+    var existingOrgSnap = (currentUser && currentUser.organisations || []).find(function(o) { return o.url === url; });
+    var isRefresh = !!(existingOrgSnap && existingOrgSnap.queryBank && existingOrgSnap.queryBank.length > 0);
+
+    // Build rotating facts from existing data
+    var facts = [];
+    if (existingOrgSnap) {
+      var snapAgg = computeAggregated(existingOrgSnap, (currentUser && currentUser.reports) || [], null);
+      if (snapAgg.totalQ > 0) facts.push('From your previous data: <strong>' + brand + '</strong> appeared in <strong>' + snapAgg.mentions + ' of ' + snapAgg.totalQ + '</strong> queries tested.');
+      if (snapAgg.score > 0) facts.push('Your current AI visibility score is <strong>' + snapAgg.score + '%</strong> — based on ' + snapAgg.runCount + ' report' + (snapAgg.runCount !== 1 ? 's' : '') + ' in the dataset.');
+      if (snapAgg.topComps.length > 0) facts.push('Top gap competitor: <strong>' + x(snapAgg.topComps[0].name) + '</strong> appears in ' + snapAgg.topComps[0].count + ' queries where ' + brand + ' is absent.');
+      if (snapAgg.topComps.length > 1) facts.push('Other brands appearing in your gaps: <strong>' + snapAgg.topComps.slice(1, 3).map(function(c) { return x(c.name); }).join(', ') + '</strong>.');
+      if (snapAgg.runHistory && snapAgg.runHistory.length >= 2) {
+        var first = snapAgg.runHistory[0], last = snapAgg.runHistory[snapAgg.runHistory.length - 1];
+        var diff = last.score - first.score;
+        facts.push('Your score has ' + (diff >= 0 ? 'improved by <strong>+' + diff + ' pts</strong>' : 'changed by <strong>' + diff + ' pts</strong>') + ' since your first report.');
+      }
+      if (existingOrgSnap.queryBank && existingOrgSnap.queryBank.length > 0) facts.push('Your query bank now covers <strong>' + existingOrgSnap.queryBank.length + ' unique prompts</strong> — refreshing adds more.');
+    }
+    facts.push('AI assistants typically name just <strong>3–5 brands</strong> per query. Every position matters.');
+    facts.push('Brands that refresh regularly tend to find <strong>new gap opportunities</strong> as AI models update.');
+    facts.push('We\'re testing real buyer prompts against live AI — this takes a moment but the data is fresh.');
+
     // Show report view overlay
     document.getElementById('portal').style.display = 'none';
     var rv = document.getElementById('report-view');
@@ -2507,7 +2536,24 @@
     document.getElementById('report-nav-title').textContent = brand || url;
     document.getElementById('gen-state').style.display = 'block';
     document.getElementById('rpt-content').style.display = 'none';
-    document.getElementById('gen-title').textContent = 'Generating your AI visibility report…';
+    document.getElementById('gen-title').textContent = isRefresh ? 'Refreshing your AI visibility data…' : 'Generating your AI visibility report…';
+
+    // Start rotating facts
+    var factEl = document.getElementById('gen-fact');
+    var factIdx = 0;
+    var factTimer = null;
+    if (facts.length > 0 && factEl) {
+      factEl.style.display = 'block';
+      factEl.innerHTML = facts[0];
+      factTimer = setInterval(function() {
+        factIdx = (factIdx + 1) % facts.length;
+        factEl.style.opacity = '0';
+        setTimeout(function() {
+          factEl.innerHTML = facts[factIdx];
+          factEl.style.opacity = '1';
+        }, 500);
+      }, 4000);
+    }
 
     // Build step elements
     var stepsEl = document.getElementById('gen-steps');
@@ -2647,33 +2693,45 @@
 
       setStep('build', 'done', 'Report ready');
       setPb(100);
+      if (factTimer) clearInterval(factTimer);
 
-      // Auto-save into queryBank + runHistory
+      // Auto-save and await so we can show accumulated view
+      var savedOrg = null;
       if (token) {
-        fetch('/api/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ action: 'save_report', reportData: reportData })
-        }).then(function(res) { return res.json(); }).then(function(data) {
-          if (data.user) {
-            currentUser = data.user;
+        try {
+          var saveRes = await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ action: 'save_report', reportData: reportData })
+          });
+          var saveData = await saveRes.json();
+          if (saveData.user) {
+            currentUser = saveData.user;
             renderOrgs();
             renderSavedReports();
             renderAccount();
+            savedOrg = (currentUser.organisations || []).find(function(o) { return o.url === url; });
           }
-        }).catch(function() {});
+        } catch(e) { console.warn('Auto-save failed:', e.message); }
       }
 
-      setTimeout(function() {
-        document.getElementById('gen-state').style.display = 'none';
-        document.getElementById('rpt-content').style.display = 'block';
+      await new Promise(function(r) { setTimeout(r, 400); });
+      document.getElementById('gen-state').style.display = 'none';
+      if (factEl) factEl.style.display = 'none';
+      document.getElementById('rpt-content').style.display = 'block';
+      document.getElementById('btn-export-pdf').style.display = '';
+
+      // Show full accumulated view (all data including this new run)
+      if (savedOrg) {
+        viewFromQueryBank(savedOrg);
+      } else {
         currentReportData = reportData;
         renderReport(reportData);
         enrichCompetitors(reportData.topCompetitors, analysis.market || null);
-        document.getElementById('btn-export-pdf').style.display = '';
-      }, 600);
+      }
 
     } catch(err) {
+      if (factTimer) clearInterval(factTimer);
       console.error(err);
       document.getElementById('gen-state').innerHTML =
         '<p style="color:var(--danger);padding:20px 0;font-size:15px">Report generation failed: ' + x(err.message) + '</p>' +
